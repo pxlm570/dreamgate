@@ -83,7 +83,7 @@ npm install --registry=https://registry.npmmirror.com
 npm run dev
 ```
 
-访问 **http://localhost:5173** 即可体验。
+启动后按终端提示的本地地址访问即可体验。
 
 ### 生产构建与预览
 
@@ -94,8 +94,6 @@ npm run build
 # 本地预览生产构建产物
 npm run preview
 ```
-
-访问 **http://localhost:4173**（vite preview 默认端口）。
 
 ### 常用脚本
 
@@ -144,39 +142,6 @@ dreamgate/
 2. **Zustand + IndexedDB 自动同步** — UI 只操作 store，store 内部写 IndexedDB
 3. **AI 接入三层兜底** — Pollinations/Edge AI → 种子库/ruleParser → 默认值
 4. **降级开关双层设计** — 编译期 `VITE_DEGRADE_*` + 运行时不可逆触发
-
----
-
-## 🌐 部署
-
-### EdgeOne Pages（主，国内 CDN 加速）
-
-详见 **[docs/部署指南.md](docs/部署指南.md)**。核心步骤：
-
-1. 推送代码到 GitHub
-2. EdgeOne Pages 控制台导入仓库
-3. 自动识别 Vite + edge-functions，零 Key 部署
-4. 获取 `xxx.edgeone.app` 域名
-
-### Vercel（备，国际访问兜底）
-
-1. 导入 GitHub 仓库到 Vercel
-2. 配置环境变量 `SILICONFLOW_API_KEY`（[硅基流动](https://siliconflow.cn)免费获取）
-3. Vercel 自动识别 `api/` 为 Serverless Functions
-
----
-
-## 📋 TRAE 大赛合规留痕
-
-本项目全程使用 **TRAE IDE + web-dev skill** 编写，分阶段对话留痕：
-
-| 留痕文件 | 说明 |
-|----------|------|
-| [trae-sessions.md](trae-sessions.md) | TRAE 对话 Session ID 记录 |
-| [docs/开发记录.md](docs/开发记录.md) | 10 个 Task 完整开发记录与决策 |
-| [.trae/specs/build-dreamgate/spec.md](.trae/specs/build-dreamgate/spec.md) | 产品 Spec 文档（v3） |
-| [.trae/specs/build-dreamgate/tasks.md](.trae/specs/build-dreamgate/tasks.md) | 任务清单与状态 |
-| [docs/screenshots/](docs/screenshots/) | 关键里程碑截图 |
 
 ---
 
