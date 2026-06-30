@@ -3,3 +3,8 @@ export type { ButtonProps } from "./Button";
 export { Backdrop } from "./Backdrop";
 export type { BackdropProps } from "./Backdrop";
 export { Display, Heading, Body, Caption, Mono } from "./Typography";
+export { ScrollRevealText } from "./ScrollRevealText";
+export type { ScrollRevealTextProps } from "./ScrollRevealText";
+export { MagneticButton } from "./MagneticButton";
+export type { MagneticButtonProps } from "./MagneticButton";
+export { CustomCursor } from "./CustomCursor";

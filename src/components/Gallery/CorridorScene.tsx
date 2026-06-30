@@ -4,6 +4,8 @@
 
 import { type RefObject } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { MeshReflectorMaterial } from "@react-three/drei";
+import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import type { Dream } from "@/lib/types";
 import { getEmotionByWord } from "@/lib/emotions";
@@ -20,31 +22,67 @@ function mixColor(base: string, accent: string, ratio: number): THREE.Color {
   return new THREE.Color(base).lerp(new THREE.Color(accent), ratio);
 }
 
-/** 走廊墙壁：地板 / 天花板 / 左右墙 / 远端封口 */
-function CorridorWalls({ length }: { length: number }) {
+/** 走廊墙壁：地板（MeshReflectorMaterial 反射）+ 天花板 + 左右墙 + 远端封口 + 尽头光源 */
+function CorridorWalls({ length, accentColor }: { length: number; accentColor: string }) {
   const wallLen = length + 16;
   const centerZ = -length / 2;
   return (
     <group>
+      {/* 地板：反射材质，让门的情绪色光在地面留下倒影 */}
       <mesh position={[0, -CORRIDOR_HALF_HEIGHT, centerZ]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[6, wallLen]} />
-        <meshStandardMaterial color={WALL_COLOR} metalness={0.3} roughness={0.7} />
+        <MeshReflectorMaterial
+          blur={[300, 80]}
+          resolution={512}
+          mixBlur={1}
+          mixStrength={20}
+          roughness={0.85}
+          depthScale={1}
+          minDepthThreshold={0.4}
+          maxDepthThreshold={1.2}
+          color="#080812"
+          metalness={0.5}
+          mirror={0.4}
+        />
       </mesh>
+      {/* 天花板：微金属感，反射门光 */}
       <mesh position={[0, CORRIDOR_HALF_HEIGHT, centerZ]} rotation={[Math.PI / 2, 0, 0]}>
         <planeGeometry args={[6, wallLen]} />
-        <meshStandardMaterial color={WALL_COLOR} metalness={0.2} roughness={0.8} />
+        <meshStandardMaterial color={WALL_COLOR} metalness={0.4} roughness={0.6} />
       </mesh>
+      {/* 左墙 */}
       <mesh position={[-DOOR_OFFSET_X, 0, centerZ]} rotation={[0, Math.PI / 2, 0]}>
         <planeGeometry args={[wallLen, 6]} />
-        <meshStandardMaterial color={WALL_COLOR} metalness={0.3} roughness={0.7} />
+        <meshStandardMaterial color={WALL_COLOR} metalness={0.5} roughness={0.55} />
       </mesh>
+      {/* 右墙 */}
       <mesh position={[DOOR_OFFSET_X, 0, centerZ]} rotation={[0, -Math.PI / 2, 0]}>
         <planeGeometry args={[wallLen, 6]} />
-        <meshStandardMaterial color={WALL_COLOR} metalness={0.3} roughness={0.7} />
+        <meshStandardMaterial color={WALL_COLOR} metalness={0.5} roughness={0.55} />
       </mesh>
+      {/* 远端封口：更暗，衬托尽头光源 */}
       <mesh position={[0, 0, -length - 6]}>
         <planeGeometry args={[6, 6]} />
-        <meshStandardMaterial color="#050509" metalness={0.1} roughness={0.9} />
+        <meshStandardMaterial color="#050509" metalness={0.2} roughness={0.85} />
+      </mesh>
+      {/* 尽头引导光源：吸引视线深入走廊 */}
+      <pointLight
+        position={[0, 0, -length - 4]}
+        intensity={2.5}
+        color={accentColor}
+        distance={12}
+        decay={2}
+      />
+      {/* 尽头光晕面板：可视化光斑 */}
+      <mesh position={[0, 0, -length - 5.8]}>
+        <planeGeometry args={[2, 2]} />
+        <meshBasicMaterial
+          color={accentColor}
+          transparent
+          opacity={0.25}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
       </mesh>
     </group>
   );
@@ -118,9 +156,12 @@ export function CorridorScene({
     >
       <color attach="background" args={[fogHex]} />
       {withShaderFog && <fogExp2 attach="fog" args={[fogHex, 0.05]} />}
-      <ambientLight intensity={0.2} />
-      <hemisphereLight color={accentColor} groundColor={FOG_BASE} intensity={0.18} />
-      <CorridorWalls length={length} />
+      {/* 多层光源：环境 + 半球 + 顶光（情绪色）+ 辅光 */}
+      <ambientLight intensity={0.25} />
+      <hemisphereLight color={accentColor} groundColor={FOG_BASE} intensity={0.25} />
+      <pointLight position={[0, 4, 2]} intensity={0.6} color={accentColor} distance={15} />
+      <pointLight position={[0, -2, 4]} intensity={0.3} color="#c9b8e8" distance={10} />
+      <CorridorWalls length={length} accentColor={accentColor} />
       <CameraRig scrollRef={scrollRef} length={length} reduceMotion={reduceMotion} />
       {recent.map((d, i) => {
         const side = i % 2 === 0 ? -1 : 1;
@@ -137,6 +178,17 @@ export function CorridorScene({
           />
         );
       })}
+      {/* 后处理：Bloom 让门框辉光与尽头光晕扩散成电影感 */}
+      <EffectComposer>
+        <Bloom
+          intensity={0.7}
+          luminanceThreshold={0.3}
+          luminanceSmoothing={0.5}
+          mipmapBlur
+          radius={0.6}
+        />
+        <Vignette eskil={false} offset={0.2} darkness={0.8} />
+      </EffectComposer>
     </Canvas>
   );
 }

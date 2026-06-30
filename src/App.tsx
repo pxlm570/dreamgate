@@ -8,6 +8,7 @@ import SharePage from '@/pages/SharePage';
 import ReportPage from '@/pages/ReportPage';
 import DreamPoolPage from '@/pages/DreamPoolPage';
 import { DisclaimerFooter } from '@/components/Privacy';
+import { CustomCursor } from '@/components/ui';
 import { useDreamStore } from '@/store/useDreamStore';
 
 /**
@@ -57,6 +58,7 @@ export default function App() {
         />
       </Routes>
       <DisclaimerFooter />
+      <CustomCursor />
     </Router>
   );
 }

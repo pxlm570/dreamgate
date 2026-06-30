@@ -5,7 +5,8 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { MeshReflectorMaterial, RoundedBox } from "@react-three/drei";
+import { MeshReflectorMaterial, RoundedBox, Environment } from "@react-three/drei";
+import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import gsap from "gsap";
 
@@ -13,6 +14,7 @@ const FOG_COLOR = "#0a0a14";
 const MIRROR_COLOR = "#15132a";
 const ACCENT = "#c9b8e8";
 const ACCENT_2 = "#4ec9b0";
+const ACCENT_3 = "#8b5cf6"; // 新增：紫罗兰辉光辅色
 
 export interface MirrorGateProps {
   /** 是否触发碎镜转场 */
@@ -21,16 +23,20 @@ export interface MirrorGateProps {
   onComplete: () => void;
 }
 
-/** 微光粒子 — 梦境尘埃，缓慢漂浮 + 整体旋转 */
+/** 微光粒子 — 梦境尘埃，多层漂浮 + 闪烁 + 整体旋转（Bloom 加持下出辉光） */
 function DreamParticles() {
   const ref = useRef<THREE.Points>(null);
-  const count = 45;
+  const matRef = useRef<THREE.PointsMaterial>(null);
+  const count = 120; // 45 → 120，密度提升
   const positions = useMemo(() => {
     const arr = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      arr[i * 3] = (Math.random() - 0.5) * 14;
-      arr[i * 3 + 1] = (Math.random() - 0.5) * 10;
-      arr[i * 3 + 2] = (Math.random() - 0.5) * 8 - 1;
+      // 分两层：近层密集（z 近）、远层稀疏（z 远），营造景深
+      const layer = i % 3;
+      const zRange = layer === 0 ? 4 : layer === 1 ? 8 : 12;
+      arr[i * 3] = (Math.random() - 0.5) * 16;
+      arr[i * 3 + 1] = (Math.random() - 0.5) * 12;
+      arr[i * 3 + 2] = (Math.random() - 0.5) * zRange - 1;
     }
     return arr;
   }, []);
@@ -38,8 +44,12 @@ function DreamParticles() {
   useFrame((state) => {
     if (!ref.current) return;
     const t = state.clock.elapsedTime;
-    ref.current.rotation.y = t * 0.02;
-    ref.current.position.y = Math.sin(t * 0.15) * 0.2;
+    ref.current.rotation.y = t * 0.025;
+    ref.current.position.y = Math.sin(t * 0.15) * 0.25;
+    // 闪烁：opacity 呼吸
+    if (matRef.current) {
+      matRef.current.opacity = 0.55 + Math.sin(t * 0.8) * 0.2;
+    }
   });
 
   return (
@@ -48,7 +58,8 @@ function DreamParticles() {
         <bufferAttribute attach="attributes-position" args={[positions, 3]} />
       </bufferGeometry>
       <pointsMaterial
-        size={0.07}
+        ref={matRef}
+        size={0.085}
         color={ACCENT}
         transparent
         opacity={0.75}
@@ -60,25 +71,48 @@ function DreamParticles() {
   );
 }
 
-/** 镜框 + 边缘辉光（始终存在，给镜面依托） */
+/** 镜框 + 边缘辉光（多层叠加，Bloom 加持下出电影感光晕） */
 function MirrorFrame() {
   return (
     <group position={[0, 0, -0.06]}>
       <RoundedBox args={[2.35, 3.35, 0.12]} radius={0.06} smoothness={4}>
         <meshStandardMaterial
           color="#08080f"
-          metalness={0.7}
-          roughness={0.5}
-          emissive={ACCENT}
-          emissiveIntensity={0.06}
+          metalness={0.85}
+          roughness={0.35}
+          emissive={ACCENT_3}
+          emissiveIntensity={0.12}
         />
       </RoundedBox>
+      {/* 内层辉光：紧贴镜框，紫罗兰 */}
       <mesh position={[0, 0, -0.02]}>
-        <planeGeometry args={[2.7, 3.7]} />
+        <planeGeometry args={[2.55, 3.55]} />
+        <meshBasicMaterial
+          color={ACCENT_3}
+          transparent
+          opacity={0.12}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+      {/* 外层辉光：更大范围，淡紫白，营造光晕扩散 */}
+      <mesh position={[0, 0, -0.04]}>
+        <planeGeometry args={[3.1, 4.1]} />
         <meshBasicMaterial
           color={ACCENT}
           transparent
-          opacity={0.07}
+          opacity={0.06}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+      {/* 顶部高光带：模拟上方光源投射 */}
+      <mesh position={[0, 1.85, 0.02]} rotation={[0, 0, 0]}>
+        <planeGeometry args={[2.2, 0.15]} />
+        <meshBasicMaterial
+          color={ACCENT}
+          transparent
+          opacity={0.4}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
@@ -266,18 +300,34 @@ export function MirrorGate({ triggering, onComplete }: MirrorGateProps) {
     <Canvas
       camera={{ position: [0, 0, 6], fov: 50 }}
       dpr={[1, 2]}
-      gl={{ antialias: true, alpha: false }}
+      gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
       style={{ position: "absolute", inset: 0 }}
     >
       <color attach="background" args={[FOG_COLOR]} />
       <fogExp2 attach="fog" args={[FOG_COLOR, 0.055]} />
-      <ambientLight intensity={0.35} />
-      <pointLight position={[3, 4, 5]} intensity={0.7} color={ACCENT} />
-      <pointLight position={[-4, -2, 3]} intensity={0.4} color={ACCENT_2} />
+      {/* 三层光源：环境光 + 顶光（紫白）+ 侧光（青绿）+ 辅光（紫罗兰） */}
+      <ambientLight intensity={0.4} />
+      <hemisphereLight color={ACCENT} groundColor={FOG_COLOR} intensity={0.3} />
+      <pointLight position={[3, 4, 5]} intensity={1.2} color={ACCENT} distance={20} />
+      <pointLight position={[-4, -2, 3]} intensity={0.7} color={ACCENT_2} distance={15} />
+      <pointLight position={[0, 0, 3]} intensity={0.5} color={ACCENT_3} distance={10} />
+      {/* 环境贴图：让金属镜框有反射内容 */}
+      <Environment preset="night" />
       <MirrorFrame />
       <MirrorAndCamera triggering={triggering} onComplete={onComplete} />
       <Shards triggered={triggering} />
       <DreamParticles />
+      {/* 后处理：Bloom 辉光 + Vignette 暗角，电影感 */}
+      <EffectComposer>
+        <Bloom
+          intensity={0.9}
+          luminanceThreshold={0.25}
+          luminanceSmoothing={0.5}
+          mipmapBlur
+          radius={0.7}
+        />
+        <Vignette eskil={false} offset={0.15} darkness={0.85} />
+      </EffectComposer>
     </Canvas>
   );
 }
