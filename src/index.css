@@ -1,0 +1,293 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================================================
+   DreamGate 梦境档案馆 — 全局视觉系统
+   深色沉浸式基调 + 雾/粒子/噪点电影级氛围
+   ========================================================================= */
+
+:root {
+  /* ---- 字体 ---- */
+  --font-display: "Cormorant Garamond", "Cinzel", "Noto Serif SC", serif;
+  --font-body: "Noto Serif SC", "EB Garamond", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* ---- 深色基调（自底向上） ---- */
+  --bg-deep: #07070d;       /* 近黑紫，最底层 */
+  --bg-base: #0c0c16;       /* 基础背景 */
+  --bg-elevated: #14141f;   /* 抬升层（卡片/面板） */
+
+  /* ---- 文字层级 ---- */
+  --text-primary: #e8e6f0;
+  --text-secondary: #9a96b0;
+  --text-muted: #5a5670;
+
+  /* ---- 梦境色板（4 美学预设代表色，附录 D） ---- */
+  --ethereal: #c9b8e8;      /* 淡紫白 — 温柔/宁静 */
+  --dark-fantasy: #8b1e3f;  /* 暗红 — 恐惧/沉重 */
+  --mystical: #4ec9b0;      /* 青绿 — 出神/沉醉 */
+  --psychedelic: #ff6b9d;   /* 粉红 — 兴奋/焦躁 */
+
+  /* ---- 雾与边框 ---- */
+  --fog: rgba(180, 170, 210, 0.06);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.12);
+
+  /* ---- 工具值 ---- */
+  --vignette-strength: 0.55;
+  --grain-opacity: 0.06;
+}
+
+/* =========================================================================
+   防白闪：在 React 挂载前 body 已是深色
+   ========================================================================= */
+html {
+  background-color: var(--bg-deep);
+  color-scheme: dark;
+}
+
+body.dg-no-flash,
+body {
+  margin: 0;
+  background-color: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-weight: 400;
+  line-height: 1.6;
+  overflow-x: hidden;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* 主体深色渐变，避免大块纯色 */
+  background-image: linear-gradient(180deg, #07070d 0%, #0c0c16 55%, #07070d 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+#root {
+  isolation: isolate;
+  min-height: 100vh;
+}
+
+/* =========================================================================
+   滚动条：细、半透明、梦境感
+   ========================================================================= */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(180, 170, 210, 0.18) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(180, 170, 210, 0.18);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(201, 184, 232, 0.35);
+  background-clip: content-box;
+}
+
+/* =========================================================================
+   选区高亮：梦境色
+   ========================================================================= */
+::selection {
+  background: rgba(201, 184, 232, 0.28);
+  color: #fff;
+  text-shadow: 0 0 8px rgba(201, 184, 232, 0.5);
+}
+::-moz-selection {
+  background: rgba(201, 184, 232, 0.28);
+  color: #fff;
+}
+
+/* =========================================================================
+   焦点可见：梦境色微光环（无障碍）
+   ========================================================================= */
+:focus-visible {
+  outline: 1px solid rgba(201, 184, 232, 0.6);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* =========================================================================
+   工具类：色调滤镜基础（画廊统一一致性，可在画廊组件按预设叠加）
+   ========================================================================= */
+.dreamlike-filter {
+  filter: contrast(1.02) saturate(0.95) brightness(0.98);
+  /* 适度柔化，去数码锐利感，添梦境朦胧 */
+}
+
+/* =========================================================================
+   工具类：文字微光晕（镜门标题/大标题）
+   ========================================================================= */
+.text-glow {
+  text-shadow:
+    0 0 14px rgba(201, 184, 232, 0.35),
+    0 0 32px rgba(201, 184, 232, 0.18),
+    0 1px 1px rgba(0, 0, 0, 0.6);
+}
+
+.text-glow-soft {
+  text-shadow:
+    0 0 10px rgba(232, 230, 240, 0.25),
+    0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* =========================================================================
+   工具类：暗角（沉浸感）
+   ========================================================================= */
+.vignette {
+  position: relative;
+}
+.vignette::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(
+    120% 90% at 50% 40%,
+    transparent 0%,
+    transparent 50%,
+    rgba(0, 0, 0, var(--vignette-strength)) 100%
+  );
+}
+.vignette--fixed::after {
+  position: fixed;
+}
+
+/* =========================================================================
+   工具类：噪点纹理叠层（电影胶片质感）
+   使用内联 SVG fractalNoise 作为 background，无需外部资源
+   ========================================================================= */
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-repeat: repeat;
+  background-size: 200px 200px;
+  animation: grain-shift 8s steps(6) infinite;
+}
+
+@keyframes grain-shift {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-3%, 2%); }
+  40% { transform: translate(2%, -3%); }
+  60% { transform: translate(-2%, -2%); }
+  80% { transform: translate(3%, 1%); }
+  100% { transform: translate(0, 0); }
+}
+
+/* =========================================================================
+   美学预设专属滤镜（附录 D，按预设名加在图片/画廊容器上）
+   ========================================================================= */
+.preset-Ethereal {
+  filter: hue-rotate(-10deg) saturate(0.8) brightness(1.1);
+}
+.preset-Dark-Fantasy {
+  filter: saturate(1.2) contrast(1.15) brightness(0.85);
+}
+.preset-Mystical {
+  filter: hue-rotate(15deg) saturate(1.1) brightness(1.05);
+}
+.preset-Psychedelic {
+  filter: saturate(1.4) hue-rotate(20deg) contrast(1.1);
+}
+
+/* 说明：.dreamlike-filter 是温和基础滤镜（用于非预设图统一柔化）；
+   .preset-X 是附录 D 专属滤镜。画廊中按预设二选一或外层套 dreamlike +
+   内层图套 preset（嵌套元素可叠加 filter，同元素 filter 后写覆盖前写）。 */
+
+/* =========================================================================
+   滚动平滑兜底（Lenis 接管时由 JS 控制 html.classList）
+   ========================================================================= */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+/* =========================================================================
+   全局动画 keyframes（与 tailwind.config.js 对应，供纯 CSS 场景使用）
+   ========================================================================= */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(20px, -10px, 0) scale(1.04); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.6; filter: brightness(1); }
+  50% { opacity: 1; filter: brightness(1.25); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 额外：缓慢呼吸（用于镜门/光晕） */
+@keyframes breathe {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.03); }
+}
+
+/* =========================================================================
+   减少动画偏好：尊重用户系统设置
+   ========================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .grain {
+    animation: none;
+  }
+}
+
+/* =========================================================================
+   链接基础样式
+   ========================================================================= */
+a {
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+a:hover {
+  color: var(--ethereal);
+}
+
+/* =========================================================================
+   图片基础：避免图片加载时跳动 + 默认 dreamlike
+   ========================================================================= */
+img {
+  display: block;
+  max-width: 100%;
+}

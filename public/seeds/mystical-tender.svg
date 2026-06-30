@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="mainGlow" cx="48.54%" cy="54.79%" r="70%">
+      <stop offset="0%" stop-color="#5A189A" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#5A189A" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#5A189A" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="50%" cy="50%" r="75%">
+      <stop offset="55%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.85"/>
+    </radialGradient>
+    <filter id="orbBlur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="80"/>
+    </filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>
+    </filter>
+  </defs>
+  <!-- 1. 深色底 -->
+  <rect width="1024" height="1024" fill="#0a0814"/>
+  <!-- 2. 预设主色大径向辉光铺底 -->
+  <rect width="1024" height="1024" fill="url(#mainGlow)"/>
+  <!-- 3. 2 辅色 + 1 情绪色 模糊 orb -->
+    <circle cx="760" cy="236" r="282" fill="#5A189A" filter="url(#orbBlur)" opacity="0.55"/>
+    <circle cx="376" cy="516" r="276" fill="#9D4EDD" filter="url(#orbBlur)" opacity="0.55"/>
+    <circle cx="656" cy="796" r="250" fill="#FFAFCC" filter="url(#orbBlur)" opacity="0.55"/>
+  <!-- 4. feTurbulence 颗粒层（~8% 不透明度） -->
+  <rect width="1024" height="1024" filter="url(#grain)" opacity="0.08"/>
+  <!-- 5. 径向暗角 vignette -->
+  <rect width="1024" height="1024" fill="url(#vignette)"/>
+</svg>
