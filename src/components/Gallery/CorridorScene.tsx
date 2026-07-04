@@ -10,8 +10,6 @@ import * as THREE from "three";
 import type { Dream } from "@/lib/types";
 import { getEmotionByWord } from "@/lib/emotions";
 import { DreamDoor } from "./DreamDoor";
-import { SilverDreamEffect } from "@/components/Atmosphere/SilverDreamEffect";
-import { useSilverFilter } from "@/lib/silverFilter";
 
 const FOG_BASE = "#07070d";
 const DOOR_SPACING = 4; // 每扇门 z 间距
@@ -290,8 +288,6 @@ export function CorridorScene({
   const dpr: [number, number] =
     typeof window !== "undefined" && window.innerWidth < 768 ? [1, 1.2] : [1, 1.5];
   const glowTex = useMemo(makeGlowTexture, []);
-  const silver = useSilverFilter();
-  const silverFx = useMemo(() => new SilverDreamEffect(), []);
 
   return (
     <Canvas
@@ -339,8 +335,6 @@ export function CorridorScene({
           mipmapBlur
           radius={0.65}
         />
-        {/* 银盐梦境滤镜（可开关） */}
-        {silver && <primitive object={silverFx} />}
         <Vignette eskil={false} offset={0.2} darkness={0.8} />
       </EffectComposer>
     </Canvas>

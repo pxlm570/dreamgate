@@ -9,8 +9,6 @@ import { MeshReflectorMaterial, RoundedBox } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import gsap from "gsap";
-import { SilverDreamEffect } from "@/components/Atmosphere/SilverDreamEffect";
-import { useSilverFilter } from "@/lib/silverFilter";
 
 const FOG_COLOR = "#0a0a14";
 const ACCENT = "#c9b8e8";
@@ -467,8 +465,6 @@ export function MirrorGate({ triggering, onComplete }: MirrorGateProps) {
   const glow = useMemo(makeGlowTexture, []);
   const shaft = useMemo(makeShaftTexture, []);
   const nebula = useMemo(makeNebulaTexture, []);
-  const silver = useSilverFilter();
-  const silverFx = useMemo(() => new SilverDreamEffect(), []);
   return (
     <Canvas
       camera={{ position: [0, 0, 6], fov: 50 }}
@@ -538,8 +534,6 @@ export function MirrorGate({ triggering, onComplete }: MirrorGateProps) {
           mipmapBlur
           radius={0.72}
         />
-        {/* 银盐梦境滤镜（可开关）：双色调 + Bayer 有序抖动，统一全画面质感 */}
-        {silver && <primitive object={silverFx} />}
         <Vignette eskil={false} offset={0.15} darkness={0.88} />
       </EffectComposer>
     </Canvas>
