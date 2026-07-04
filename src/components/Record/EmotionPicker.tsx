@@ -39,21 +39,30 @@ export function EmotionPicker({ value, onChange }: EmotionPickerProps) {
                     type="button"
                     onClick={() => onChange?.(selected ? undefined : e.word)}
                     className={cn(
-                      "rounded-full border px-3 py-1 text-sm transition-all duration-200",
+                      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-all duration-200",
                       selected
                         ? "text-white"
-                        : "border-white/10 text-dreamgate-text-secondary hover:text-dreamgate-text-primary",
+                        : "border-white/10 text-dreamgate-text-secondary hover:border-white/25 hover:text-dreamgate-text-primary",
                     )}
                     style={
                       selected
                         ? {
-                            backgroundColor: `${e.color}33`,
+                            backgroundColor: `${e.color}22`,
                             borderColor: e.color,
                             color: e.color,
+                            boxShadow: `0 0 16px -4px ${e.color}99`,
                           }
                         : undefined
                     }
                   >
+                    {/* 情绪色点：让选择器在未选中时也呈现为「情绪的调色盘」 */}
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{
+                        backgroundColor: e.color,
+                        boxShadow: selected ? `0 0 8px ${e.color}` : undefined,
+                      }}
+                    />
                     {e.word}
                   </button>
                 );

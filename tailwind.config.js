@@ -32,7 +32,8 @@ export default {
       },
       fontFamily: {
         // display：标题/镜门文字（Cormorant Garamond 衬线优雅，Cinzel 仪式感兜底）
-        display: ['"Cormorant Garamond"', '"Cinzel"', '"Noto Serif SC"', "serif"],
+        // 拉丁字符走 Cormorant/Cinzel；中文字符（前两者无字形）落到 ZCOOL XiaoWei 清瘦文学宋
+        display: ['"Cormorant Garamond"', '"Cinzel"', '"ZCOOL XiaoWei"', '"Noto Serif SC"', "serif"],
         // body：正文（Noto Serif SC 中文衬线 + EB Garamond 英文衬线）
         body: ['"Noto Serif SC"', '"EB Garamond"', "ui-serif", "Georgia", "serif"],
         // mono：情绪标签/数据
@@ -43,6 +44,12 @@ export default {
         drift: "drift 24s ease-in-out infinite",
         "pulse-glow": "pulse-glow 4s ease-in-out infinite",
         "fade-in": "fade-in 1.2s ease-out both",
+        // 镜之门入场（纯 CSS，免受主线程拥塞导致 JS 动画丢帧的影响）
+        "gate-rise": "gate-rise 1s cubic-bezier(0.22,1,0.36,1) both",
+        "gate-up": "gate-up 1s ease-out both",
+        "gate-line": "gate-line 1.1s cubic-bezier(0.22,1,0.36,1) both",
+        "gate-divider": "gate-divider 1.1s cubic-bezier(0.22,1,0.36,1) both",
+        "gate-arrow": "gate-arrow 2.4s ease-in-out infinite",
       },
       keyframes: {
         float: {
@@ -60,6 +67,26 @@ export default {
         "fade-in": {
           from: { opacity: "0", transform: "translateY(8px)" },
           to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "gate-rise": {
+          from: { opacity: "0", transform: "translateY(34px)", filter: "blur(10px)" },
+          to: { opacity: "1", transform: "translateY(0)", filter: "blur(0)" },
+        },
+        "gate-up": {
+          from: { opacity: "0", transform: "translateY(12px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "gate-line": {
+          from: { opacity: "0", transform: "scaleY(0)" },
+          to: { opacity: "1", transform: "scaleY(1)" },
+        },
+        "gate-divider": {
+          from: { opacity: "0", transform: "scaleX(0)" },
+          to: { opacity: "1", transform: "scaleX(1)" },
+        },
+        "gate-arrow": {
+          "0%, 100%": { transform: "translateY(0)", opacity: "0.4" },
+          "50%": { transform: "translateY(6px)", opacity: "1" },
         },
       },
       backgroundImage: {

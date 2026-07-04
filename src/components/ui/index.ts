@@ -8,3 +8,5 @@ export type { ScrollRevealTextProps } from "./ScrollRevealText";
 export { MagneticButton } from "./MagneticButton";
 export type { MagneticButtonProps } from "./MagneticButton";
 export { CustomCursor } from "./CustomCursor";
+export { SmoothScroll } from "./SmoothScroll";
+export { GlobalNav } from "./GlobalNav";

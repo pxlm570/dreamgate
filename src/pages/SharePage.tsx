@@ -68,12 +68,18 @@ export default function SharePage() {
   const degraded = !readOnly && (DEGRADATION_FLAGS.shareCard3D || isMobile);
 
   if (!dream) {
+    // 有 ?d= 参数却没解析出 dream → 链接在传输中被截断/损坏，区别于「本地无此梦」
+    const decodeFailed = !!search.get("d");
     return (
       <Backdrop preset="default" intensity={0.4}>
         <div className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 text-center">
-          <Display className="text-3xl">梦境不存在</Display>
+          <Display className="text-3xl">
+            {decodeFailed ? "链接已损坏或过长" : "梦境不存在"}
+          </Display>
           <Caption as="p" className="mt-3 block">
-            这场梦可能已被遗忘，或链接已损坏
+            {decodeFailed
+              ? "这条分享链接无法解析，可能在传输中被截断，请让对方重新复制完整链接"
+              : "这场梦可能已被遗忘，或链接已损坏"}
           </Caption>
           <Link to="/gallery" className="mt-8">
             <Button variant="ghost" size="sm">

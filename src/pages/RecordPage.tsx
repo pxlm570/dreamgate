@@ -5,7 +5,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Backdrop, Display, Caption } from "@/components/ui";
+import { Backdrop, Display, Caption, SmoothScroll } from "@/components/ui";
 import { RecordForm } from "@/components/Record";
 import { useDreamStore } from "@/store/useDreamStore";
 import type { Meta } from "@/lib/types";
@@ -47,14 +47,15 @@ export default function RecordPage() {
 
   return (
     <Backdrop preset="Ethereal" intensity={0.6}>
-      <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-5 py-12 sm:px-8">
+      <SmoothScroll />
+      <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-5 pb-12 pt-24 sm:px-8">
         <motion.header
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
-          className="mb-8 text-center"
+          className="mb-8 text-left"
         >
-          <Display className="text-4xl text-dreamgate-text-primary sm:text-5xl">
+          <Display className="font-light leading-none tracking-tight text-[clamp(2.1rem,3.8vw,3rem)] text-dreamgate-text-primary">
             记录梦境
           </Display>
           <Caption as="span" className="mt-2 block text-sm">
@@ -62,13 +63,16 @@ export default function RecordPage() {
           </Caption>
         </motion.header>
 
+        {/* Double-bezel：外壳 + 内芯同心圆角 + 内高光，营造「机械质感玻璃托盘」 */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.9, delay: 0.15, ease: "easeOut" }}
-          className="rounded-2xl border border-white/5 bg-dreamgate-elevated/60 p-6 shadow-[0_8px_40px_rgba(0,0,0,0.4)] backdrop-blur-xl sm:p-8"
+          transition={{ duration: 0.9, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+          className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-1.5 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.65)]"
         >
-          <RecordForm onSaved={handleSaved} />
+          <div className="rounded-[calc(2rem-0.375rem)] bg-dreamgate-elevated/70 p-6 shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] backdrop-blur-xl sm:p-8">
+            <RecordForm onSaved={handleSaved} />
+          </div>
         </motion.div>
       </div>
     </Backdrop>

@@ -1,7 +1,7 @@
 /**
  * AI 接入封装
  * - 图像：Pollinations.ai flux 模型，URL 式直连（前端无 Key）
- * - 解析：边缘函数 /api/llm（SiliconFlow 代理）
+ * - 解析：边缘函数 /api/llm（EdgeOne Edge AI / DeepSeek 主，Vercel SiliconFlow 备）
  * - 兜底：图像→seedLibrary，解析→ruleParser
  * - 离线检测：navigator.onLine
  */
@@ -24,6 +24,39 @@ import {
 export function isOffline(): boolean {
   if (typeof navigator === 'undefined') return false;
   return !navigator.onLine;
+}
+
+/**
+ * 预加载图像并设硬超时——给 Pollinations 出图加护栏：
+ * resolve = 加载成功；reject = 加载失败或超时（调用方据此切种子图，避免无限等 <img>）。
+ */
+export function preloadImage(url: string, timeoutMs = 9000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (typeof Image === 'undefined') {
+      resolve();
+      return;
+    }
+    const img = new Image();
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error('image preload timeout'));
+    }, timeoutMs);
+    img.onload = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve();
+    };
+    img.onerror = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new Error('image preload error'));
+    };
+    img.src = url;
+  });
 }
 
 /**
@@ -56,6 +89,31 @@ export function generateDreamImage(
     `https://image.pollinations.ai/prompt/${encoded}` +
     `?width=1024&height=1024&seed=${seed}&nologo=true&model=flux`;
   return url;
+}
+
+/** 是否启用 gpt-image 代理（需部署 /api/img + 设 OPENAI_API_KEY，并 VITE_USE_GPT_IMAGE=true） */
+export const USE_GPT_IMAGE = import.meta.env.VITE_USE_GPT_IMAGE === 'true';
+
+/**
+ * 经 /api/img 代理调用 OpenAI gpt-image 生成梦境图，返回 data URL（或图片 URL）。
+ * 失败抛错（由调用方回退 Pollinations → 种子图）。仅在 USE_GPT_IMAGE 时被尝试。
+ */
+export async function generateImageViaProxy(
+  text: string,
+  preset: AestheticPresetName,
+  seed: number,
+): Promise<string> {
+  const prompt = buildPrompt(text, preset);
+  const res = await fetch('/api/img', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, seed }),
+  });
+  if (!res.ok) throw new Error(`img proxy failed: ${res.status}`);
+  const data = (await res.json()) as { image?: string; url?: string };
+  const out = data.image ?? data.url;
+  if (!out) throw new Error('img proxy: empty image');
+  return out;
 }
 
 /**
@@ -127,16 +185,28 @@ export async function generateArtifact(
     imageSource = 'seed';
     imageFallback = true;
   } else {
-    try {
-      imageUrl = generateDreamImage(text, preset, seed);
-      imageSource = 'ai';
-      // 注意：Pollinations URL 是即时生成的，这里不预加载校验，
-      // 由 <img> 渲染时 onError 再走兜底（调用方处理）。
-    } catch {
-      const fallbackEmotion = parseEmotionByRules(text);
-      imageUrl = getSeedImage(preset, fallbackEmotion.word);
-      imageSource = 'seed';
-      imageFallback = true;
+    let resolved = false;
+    // 优先 gpt-image 代理（仅在启用时；失败无声回退 Pollinations）
+    if (USE_GPT_IMAGE) {
+      try {
+        imageUrl = await generateImageViaProxy(text, preset, seed);
+        imageSource = 'ai';
+        resolved = true;
+      } catch {
+        /* gpt-image 不可用 → 回退 Pollinations */
+      }
+    }
+    if (!resolved) {
+      try {
+        imageUrl = generateDreamImage(text, preset, seed);
+        imageSource = 'ai';
+        // Pollinations URL 即时生成，不预加载校验；<img> onError 再走兜底（调用方处理）。
+      } catch {
+        const fallbackEmotion = parseEmotionByRules(text);
+        imageUrl = getSeedImage(preset, fallbackEmotion.word);
+        imageSource = 'seed';
+        imageFallback = true;
+      }
     }
   }
 

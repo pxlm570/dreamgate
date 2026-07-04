@@ -7,7 +7,7 @@ import { useState, type RefObject } from "react";
 import { Download, Link as LinkIcon, Check, AlertCircle } from "lucide-react";
 import { Button, Caption } from "@/components/ui";
 import type { Dream } from "@/lib/types";
-import { buildShareUrl, toPngExport } from "./shareUtils";
+import { buildShareUrl, toPngExport, copyToClipboard } from "./shareUtils";
 import type { CardConfig } from "./types";
 
 export interface ShareActionsProps {
@@ -42,25 +42,12 @@ export function ShareActions({ cardRef, dream, config }: ShareActionsProps) {
 
   const handleCopyLink = async () => {
     setError(null);
-    try {
-      const url = buildShareUrl(dream, config);
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(url);
-      } else {
-        // 兜底：临时 textarea + execCommand
-        const ta = document.createElement("textarea");
-        ta.value = url;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-      }
+    const url = buildShareUrl(dream, config);
+    const ok = await copyToClipboard(url);
+    if (ok) {
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
-    } catch (err) {
-      console.error("[ShareActions] copy link failed:", err);
+    } else {
       setError("复制链接失败，请手动复制");
     }
   };

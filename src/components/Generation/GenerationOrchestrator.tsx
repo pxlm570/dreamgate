@@ -5,7 +5,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useDreamStore } from "@/store/useDreamStore";
-import { generateArtifact, generateDreamImage, type GeneratedArtifact } from "@/lib/ai";
+import { generateArtifact, generateDreamImage, preloadImage, type GeneratedArtifact } from "@/lib/ai";
 import { getSeedImage } from "@/lib/seedLibrary";
 import { parseEmotionByRules, parseSymbolsByRules, generateRuleAnalysis } from "@/lib/ruleParser";
 import type { AestheticPresetName, Dream } from "@/lib/types";
@@ -48,7 +48,12 @@ export function GenerationOrchestrator({ dream }: GenerationOrchestratorProps) {
   const [phase, setPhase] = useState<"idle" | "image" | "analysis" | "done">("idle");
   const [artifact, setArtifact] = useState<GeneratedArtifact | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
-  const imageErroredRef = useRef(false);
+  // 记录「加载失败过的图片 URL」集合：只有最终结果恰好用了失败 URL 才兜底换种子图。
+  // （不能用布尔标记：gpt-image 路径下预览是 Pollinations、结果是 data URL，
+  //   预览超时不代表结果失败，布尔会误杀 37s 后成功返回的 gpt-image 图。）
+  const erroredUrlsRef = useRef<Set<string>>(new Set());
+  // 同一 dream 只发起一次生成，去重 StrictMode 双跑 / 重渲染导致的重复 AI 调用
+  const inFlightRef = useRef<{ key: string; promise: Promise<GeneratedArtifact> } | null>(null);
 
   const showOnboarding = !meta.onboarded;
   const showConsent = meta.onboarded && !meta.aiConsent && !aiDeclined;
@@ -58,7 +63,7 @@ export function GenerationOrchestrator({ dream }: GenerationOrchestratorProps) {
   useEffect(() => {
     if (showOnboarding || showConsent) return;
     let cancelled = false;
-    imageErroredRef.current = false;
+    erroredUrlsRef.current = new Set();
 
     async function run() {
       setPhase("image");
@@ -78,17 +83,30 @@ export function GenerationOrchestrator({ dream }: GenerationOrchestratorProps) {
         try {
           const url = generateDreamImage(dream.rawText, preset, seed);
           if (!cancelled) setPreviewUrl(url);
+          // 硬超时兜底：Pollinations 慢/挂时不无限等 <img>，超时即切种子图
+          preloadImage(url, 9000).catch(() => {
+            erroredUrlsRef.current.add(url);
+            if (!cancelled) handleImageError();
+          });
         } catch {
           /* generateArtifact 内部会兜底 */
         }
         setPhase("analysis");
-        result = await generateArtifact(dream.rawText, preset, seed);
+        // 幂等：复用同一次生成，防止重复调用 /api/llm 浪费额度
+        if (!inFlightRef.current || inFlightRef.current.key !== dream.id) {
+          inFlightRef.current = {
+            key: dream.id,
+            promise: generateArtifact(dream.rawText, preset, seed),
+          };
+        }
+        result = await inFlightRef.current.promise;
       }
 
       if (cancelled) return;
 
-      // 预加载已失败 → 直接换种子图，避免 ArtifactView 再错一次
-      if (imageErroredRef.current && !result.imageFallback) {
+      // 结果所用的 URL 已被证实加载失败 → 换种子图，避免 ArtifactView 再错一次
+      // （gpt-image data URL 与失败的 Pollinations 预览 URL 不同，不会被误杀）
+      if (!result.imageFallback && result.imageUrl && erroredUrlsRef.current.has(result.imageUrl)) {
         result = {
           ...result,
           imageUrl: getSeedImage(preset, dream.emotion.word),
@@ -117,11 +135,17 @@ export function GenerationOrchestrator({ dream }: GenerationOrchestratorProps) {
   }, [showOnboarding, showConsent, aiDeclined]);
 
   const handleImageError = () => {
-    imageErroredRef.current = true;
+    // 记录当前正在展示、且加载失败的 URL
+    const failing = artifact?.imageUrl || previewUrl;
+    if (failing) erroredUrlsRef.current.add(failing);
     const fallbackUrl = getSeedImage(preset, dream.emotion.word);
 
     if (artifact) {
-      if (artifact.imageUrl.startsWith("/seeds/")) return;
+      if (artifact.imageUrl.startsWith("/seeds/")) {
+        // 种子图也加载失败 → 清空 url，落到 ArtifactView 占位图标，避免停在坏图
+        setArtifact({ ...artifact, imageUrl: "", imageSource: "seed", imageFallback: true });
+        return;
+      }
       const patched: GeneratedArtifact = {
         ...artifact,
         imageUrl: fallbackUrl,
@@ -140,7 +164,10 @@ export function GenerationOrchestrator({ dream }: GenerationOrchestratorProps) {
         },
       }).catch((err) => console.error("[DreamGate] updateDream (img fallback) failed:", err));
     } else {
-      if (previewUrl.startsWith("/seeds/")) return;
+      if (previewUrl.startsWith("/seeds/")) {
+        setPreviewUrl("");
+        return;
+      }
       setPreviewUrl(fallbackUrl);
     }
   };

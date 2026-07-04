@@ -1,9 +1,10 @@
 // DreamDoor — 单扇梦境门 3D 组件
-// 圆角矩形面板（图像纹理 / 纯色 fallback）+ 情绪色门框 + pointLight + hover 高亮 + drei Html 标签
+// 圆角矩形面板（图像纹理 / 纯色 fallback）+ 情绪色门框 + hover 高亮 + canvas 贴图标签
+// 标签不用 drei Html：相机每帧移动会导致所有 Html 标签每帧改 DOM transform（布局抖动=卡顿），
+// 改为一次性绘制的 canvas 贴图面片，零每帧成本。
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import type { Dream } from "@/lib/types";
 import { getEmotionByWord } from "@/lib/emotions";
@@ -11,8 +12,71 @@ import { getEmotionByWord } from "@/lib/emotions";
 const DOOR_W = 2;
 const DOOR_H = 3;
 
+/** 把「标题 + 情绪」一次性画进 canvas 贴图（用页面已加载的中文字体） */
+function makeLabelTexture(
+  title: string,
+  emotion: string,
+  color: string,
+): { tex: THREE.CanvasTexture; aspect: number } {
+  const S = 2; // 超采样，保证文字清晰
+  const padX = 26;
+  const padY = 16;
+  const gap = 10;
+  const titleFont = '500 26px "ZCOOL XiaoWei", "Noto Serif SC", serif';
+  const emoFont = '400 15px "JetBrains Mono", ui-monospace, monospace';
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d")!;
+  ctx.font = titleFont;
+  const tw = ctx.measureText(title).width;
+  ctx.font = emoFont;
+  const ew = ctx.measureText(emotion).width + 16;
+  const w = Math.ceil(Math.max(tw, ew, 120) + padX * 2);
+  const h = Math.ceil(26 + gap + 16 + padY * 2);
+  canvas.width = w * S;
+  canvas.height = h * S;
+  ctx.scale(S, S);
+  // 半透明深色圆角底 + 细描边（与原 DOM 标签一致的观感）
+  const r = 12;
+  ctx.beginPath();
+  ctx.moveTo(r, 0);
+  ctx.lineTo(w - r, 0);
+  ctx.arcTo(w, 0, w, r, r);
+  ctx.lineTo(w, h - r);
+  ctx.arcTo(w, h, w - r, h, r);
+  ctx.lineTo(r, h);
+  ctx.arcTo(0, h, 0, h - r, r);
+  ctx.lineTo(0, r);
+  ctx.arcTo(0, 0, r, 0, r);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(6,6,16,0.68)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // 标题
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.font = titleFont;
+  ctx.fillStyle = "rgba(240,238,248,0.96)";
+  ctx.fillText(title, w / 2, padY);
+  // 情绪：色点 + 词
+  ctx.font = emoFont;
+  ctx.fillStyle = color;
+  const ey = padY + 26 + gap;
+  ctx.beginPath();
+  ctx.arc(w / 2 - ew / 2 + 4, ey + 8, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.textAlign = "left";
+  ctx.fillText(emotion, w / 2 - ew / 2 + 14, ey);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  return { tex, aspect: w / h };
+}
+
 /** 纯色 fallback 面板（imageUrl 为空或加载失败时） */
-function DoorPanelPlain({ color, label }: { color: string; label?: string }) {
+function DoorPanelPlain({ color }: { color: string }) {
   return (
     <mesh>
       <planeGeometry args={[DOOR_W, DOOR_H]} />
@@ -22,13 +86,6 @@ function DoorPanelPlain({ color, label }: { color: string; label?: string }) {
         emissiveIntensity={0.18}
         roughness={0.6}
       />
-      {label && (
-        <Html position={[0, 0, 0.02]} center distanceFactor={6} pointerEvents="none">
-          <span className="font-mono text-xs text-white/70 tracking-widest">
-            {label}
-          </span>
-        </Html>
-      )}
     </mesh>
   );
 }
@@ -65,11 +122,19 @@ function DoorPanelTextured({
     };
   }, [imageUrl]);
 
-  if (!texture) return <DoorPanelPlain color={fallbackColor} label="生成中" />;
+  if (!texture) return <DoorPanelPlain color={fallbackColor} />;
   return (
     <mesh>
       <planeGeometry args={[DOOR_W, DOOR_H]} />
-      <meshStandardMaterial map={texture} toneMapped={false} roughness={0.55} />
+      {/* emissiveMap 让梦境图自发光，即使暗色种子图也能读出「发光藏品」质感 */}
+      {/* 走 ACES 电影调色（toneMapped 默认 true）：高光柔和滚降，画作更「胶片」 */}
+      <meshStandardMaterial
+        map={texture}
+        emissiveMap={texture}
+        emissive="#ffffff"
+        emissiveIntensity={0.55}
+        roughness={0.55}
+      />
     </mesh>
   );
 }
@@ -80,6 +145,12 @@ export interface DreamDoorProps {
   /** 绕 Y 轴旋转，使门朝向走廊内侧 */
   rotationY?: number;
   onClick: (dream: Dream) => void;
+  /** 聚焦模式下隐藏门下标签（信息由底部展签面板接管） */
+  hideLabel?: boolean;
+  /** 当前被聚焦（展签态）：射灯/光池增强 */
+  highlight?: boolean;
+  /** 径向柔光贴图（地面光池用），由场景传入避免重复生成 */
+  glowTex?: THREE.Texture;
 }
 
 export function DreamDoor({
@@ -87,6 +158,9 @@ export function DreamDoor({
   position,
   rotationY = 0,
   onClick,
+  hideLabel = false,
+  highlight = false,
+  glowTex,
 }: DreamDoorProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
@@ -98,19 +172,31 @@ export function DreamDoor({
       ? dream.rawText.slice(0, 20) + "…"
       : dream.rawText;
 
-  // hover 时门微微放大 + 整体辉光强度跟随（每帧 lerp 平滑过渡）
+  // 标签贴图：一次性绘制（标题/情绪/颜色变化时重绘）
+  const label = useMemo(
+    () => makeLabelTexture(title || "（无题）", dream.emotion.word, emotionColor),
+    [title, dream.emotion.word, emotionColor],
+  );
+
+  // hover / 聚焦 时门微微放大 + 辉光与标签透明度跟随（每帧 lerp 平滑过渡）
+  const lit = hovered || highlight;
   const glowRef = useRef<THREE.Mesh>(null);
+  const labelRef = useRef<THREE.Sprite>(null);
   useFrame(() => {
     const g = groupRef.current;
     if (!g) return;
-    const target = hovered ? 1.06 : 1;
+    const target = lit ? 1.06 : 1;
     g.scale.x = THREE.MathUtils.lerp(g.scale.x, target, 0.15);
     g.scale.y = THREE.MathUtils.lerp(g.scale.y, target, 0.15);
-    // 外层辉光 mesh 的 opacity 跟随 hover
+    // 外层辉光 mesh 的 opacity 跟随点亮状态
     if (glowRef.current) {
       const mat = glowRef.current.material as THREE.MeshBasicMaterial;
-      const targetOpacity = hovered ? 0.35 : 0.08;
+      const targetOpacity = lit ? 0.35 : 0.08;
       mat.opacity = THREE.MathUtils.lerp(mat.opacity, targetOpacity, 0.12);
+    }
+    if (labelRef.current) {
+      const mat = labelRef.current.material as THREE.SpriteMaterial;
+      mat.opacity = THREE.MathUtils.lerp(mat.opacity, lit ? 1 : 0.75, 0.12);
     }
   });
 
@@ -128,15 +214,15 @@ export function DreamDoor({
         />
       </mesh>
 
-      {/* 门框 */}
+      {/* 门框：细边金属画框（宽框+高发光显塑料；细框+低静息发光更像美术馆画框） */}
       <mesh position={[0, 0, -0.06]}>
-        <boxGeometry args={[DOOR_W + 0.28, DOOR_H + 0.28, 0.12]} />
+        <boxGeometry args={[DOOR_W + 0.18, DOOR_H + 0.18, 0.1]} />
         <meshStandardMaterial
           color="#08080f"
-          metalness={0.75}
-          roughness={0.3}
+          metalness={0.85}
+          roughness={0.24}
           emissive={emotionColor}
-          emissiveIntensity={hovered ? 0.85 : 0.22}
+          emissiveIntensity={lit ? 0.7 : 0.16}
         />
       </mesh>
 
@@ -163,51 +249,43 @@ export function DreamDoor({
             fallbackColor={emotionColor}
           />
         ) : (
-          <DoorPanelPlain color={emotionColor} label="生成中" />
+          <DoorPanelPlain color={emotionColor} />
         )}
       </group>
 
-      {/* 情绪氛围灯：hover 时更强、更远 */}
-      <pointLight
-        color={emotionColor}
-        intensity={hovered ? 2.2 : 0.7}
-        distance={hovered ? 9 : 6}
-        position={[0, 0, 1.3]}
-      />
+      {/* 注：不再每门挂 pointLight——20 扇门 = 20 个逐光源计费的光，是走廊卡顿主因。
+          门面板 emissiveMap 自发光 + 光池 + Bloom 已足够呈现「射灯打亮」。 */}
 
-      {/* 下方 HTML 标签：标题 + 情绪词，hover 时从模糊到清晰 */}
-      <Html
-        position={[0, -DOOR_H / 2 - 0.6, 0.4]}
-        center
-        distanceFactor={8}
-        pointerEvents="none"
-        zIndexRange={[10, 0]}
-        style={{
-          opacity: hovered ? 1 : 0.5,
-          filter: hovered ? "blur(0px)" : "blur(2px)",
-          transform: hovered ? "translateY(0)" : "translateY(4px)",
-          transition: "opacity 0.4s ease, filter 0.4s ease, transform 0.4s ease",
-        }}
-      >
-        <div className="flex flex-col items-center gap-1 rounded-lg border border-white/10 bg-black/55 px-3 py-1.5 backdrop-blur-md">
-          <span className="whitespace-nowrap font-display text-sm text-white text-glow-soft">
-            {title || "（无题）"}
-          </span>
-          <span
-            className="flex items-center gap-1.5 font-mono text-[10px]"
-            style={{ color: emotionColor }}
-          >
-            <span
-              className="inline-block h-1.5 w-1.5 rounded-full"
-              style={{
-                background: emotionColor,
-                boxShadow: `0 0 8px ${emotionColor}`,
-              }}
-            />
-            {dream.emotion.word}
-          </span>
-        </div>
-      </Html>
+      {/* 画前地面光池：博物馆射灯洒在地板上的光斑（配反射地板成空间锚点） */}
+      {glowTex && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2.96, 1.0]} scale={[2.8, 1.8, 1]}>
+          <planeGeometry args={[1, 1]} />
+          <meshBasicMaterial
+            map={glowTex}
+            color={emotionColor}
+            transparent
+            opacity={lit ? 0.7 : 0.36}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+
+      {/* 下方标签：canvas 贴图 sprite（一次绘制零每帧成本；sprite 始终面向相机） */}
+      {!hideLabel && (
+        <sprite
+          ref={labelRef}
+          position={[0, -DOOR_H / 2 - 0.55, 0.5]}
+          scale={[1.5, 1.5 / label.aspect, 1]}
+        >
+          <spriteMaterial
+            map={label.tex}
+            transparent
+            opacity={0.75}
+            depthWrite={false}
+          />
+        </sprite>
+      )}
     </group>
   );
 }

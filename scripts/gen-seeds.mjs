@@ -1,25 +1,25 @@
 /**
- * DreamGate 种子占位图生成器（Task 10 v3 / Workstream A）
+ * DreamGate 种子占位图生成器（v2 · 更通透有层次的梦境氛围图）
  *
  * 参数化生成 4 预设 × 5 情绪键 = 20 张 SVG 占位图到 public/seeds/。
- * 每张 SVG 为 1024×1024，包含：深色底 + 预设主色径向辉光 +
- * 2 辅色 + 1 情绪色模糊 orb + feTurbulence 颗粒层 + 径向暗角。
- * orb 位置由 (presetIdx, emotionIdx) 确定性公式决定，每张独特但风格一致、可复现。
+ * 每张 1024×1024，分层：深色底 + 顶部主色渐晕（光从上方）+ 主色/情绪色双径向辉光 +
+ * 4 个柔和 orb（预设辅色/情绪色/主色）+ 5 颗微光星点 + 顶部柔光 + feTurbulence 细颗粒 + 柔和暗角。
+ * 所有位置由 (presetIdx, emotionIdx, salt) 质数公式确定 —— 每张独特、风格一致、可复现。
+ * 门面板以 emissiveMap 自发光渲染，故图越通透有光，门越美。
  *
  * 用法：node scripts/gen-seeds.mjs
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-// v3 #4：首行即确保输出目录存在
 mkdirSync('public/seeds', { recursive: true });
 
 /** 4 个预设：底色 / 辅色列表 / 主色 */
 const PRESETS = [
-  { slug: 'ethereal', base: '#0a0a14', aux: ['#C9B8E8', '#E8E0F5'], main: '#C9B8E8' },
-  { slug: 'dark-fantasy', base: '#0d0608', aux: ['#EF476F', '#6A0572'], main: '#EF476F' },
-  { slug: 'mystical', base: '#0a0814', aux: ['#5A189A', '#9D4EDD'], main: '#5A189A' },
-  { slug: 'psychedelic', base: '#0a0a0f', aux: ['#FFD166', '#06D6A0'], main: '#FFD166' },
+  { slug: 'ethereal', base: '#0a0a16', aux: ['#C9B8E8', '#E8E0F5'], main: '#C9B8E8' },
+  { slug: 'dark-fantasy', base: '#0d0609', aux: ['#EF476F', '#6A0572'], main: '#EF476F' },
+  { slug: 'mystical', base: '#0a0816', aux: ['#7B2FBE', '#9D4EDD'], main: '#7B2FBE' },
+  { slug: 'psychedelic', base: '#0b0a10', aux: ['#FFD166', '#06D6A0'], main: '#FF6B9D' },
 ];
 
 /** 5 个情绪键 + orb 色 */
@@ -33,20 +33,19 @@ const EMOTIONS = [
 
 const DIM = 1024;
 
-/**
- * 确定性坐标：把 (presetIdx, emotionIdx, salt) 映射到 [min, max] 区间。
- * 用质数乘子避免线性相关，保证每张独特但可复现。
- */
-function detCoord(p, e, salt, min, max) {
-  const raw = (p * 137 + e * 89 + salt * 211) % 1000;
-  return min + Math.floor((raw / 1000) * (max - min));
+/** 确定性整数 0..mod-1 */
+function det(p, e, salt, mod) {
+  return (p * 137 + e * 89 + salt * 211) % mod;
 }
-
+/** 确定性坐标映射到 [min, max] */
+function detCoord(p, e, salt, min, max) {
+  return min + Math.floor((det(p, e, salt, 1000) / 1000) * (max - min));
+}
 /** 确定性半径 */
 function detRadius(p, e, salt, base, range) {
-  const raw = (p * 53 + e * 71 + salt * 97) % range;
-  return base + raw;
+  return base + ((p * 53 + e * 71 + salt * 97) % range);
 }
+const pct = (v) => ((v / DIM) * 100).toFixed(2);
 
 /** 生成单张 SVG 字符串 */
 function generateSVG(presetIdx, emotionIdx) {
@@ -55,91 +54,94 @@ function generateSVG(presetIdx, emotionIdx) {
   const p = presetIdx;
   const e = emotionIdx;
 
-  // 主色径向辉光中心（在画布中心附近小幅偏移）
-  const mainCx = detCoord(p, e, 0, 360, 664);
-  const mainCy = detCoord(p, e, 1, 360, 664);
+  // 主色辉光（偏上，像光源）+ 情绪色辉光（偏下另一侧）
+  const mainCx = detCoord(p, e, 0, 340, 684);
+  const mainCy = detCoord(p, e, 1, 300, 540);
+  const emoCx = detCoord(p, e, 8, 220, 804);
+  const emoCy = detCoord(p, e, 9, 520, 840);
 
-  // 3 个 orb：2 辅色 + 1 情绪色（salt = 2,3,4）
+  // 4 个柔和 orb：辅色 ×2 + 情绪色 + 主色（最后一个较小较亮）
   const orbs = [
-    {
-      cx: detCoord(p, e, 2, 180, 844),
-      cy: detCoord(p, e, 3, 180, 844),
-      r: detRadius(p, e, 2, 260, 140),
-      color: preset.aux[0],
-    },
-    {
-      cx: detCoord(p, e, 4, 180, 844),
-      cy: detCoord(p, e, 5, 180, 844),
-      r: detRadius(p, e, 4, 240, 150),
-      color: preset.aux[1],
-    },
-    {
-      cx: detCoord(p, e, 6, 180, 844),
-      cy: detCoord(p, e, 7, 180, 844),
-      r: detRadius(p, e, 6, 220, 160),
-      color: emotion.color,
-    },
+    { cx: detCoord(p, e, 2, 120, 904), cy: detCoord(p, e, 3, 120, 720), r: detRadius(p, e, 2, 300, 180), color: preset.aux[0], op: 0.5, blur: 'orbBlur' },
+    { cx: detCoord(p, e, 4, 120, 904), cy: detCoord(p, e, 5, 220, 904), r: detRadius(p, e, 4, 260, 200), color: preset.aux[1], op: 0.42, blur: 'orbBlur' },
+    { cx: detCoord(p, e, 6, 150, 874), cy: detCoord(p, e, 7, 150, 874), r: detRadius(p, e, 6, 220, 180), color: emotion.color, op: 0.5, blur: 'orbBlur' },
+    { cx: detCoord(p, e, 10, 220, 804), cy: detCoord(p, e, 11, 160, 680), r: detRadius(p, e, 10, 150, 120), color: preset.main, op: 0.5, blur: 'softBlur' },
   ];
 
-  // 用 SVG 百分比表达主色辉光中心（相对 1024 画布）
-  const mainCxPct = ((mainCx / DIM) * 100).toFixed(2);
-  const mainCyPct = ((mainCy / DIM) * 100).toFixed(2);
+  // 5 颗微光星点（细小、柔化、明灭感）
+  const stars = Array.from({ length: 5 }, (_, s) => ({
+    cx: detCoord(p, e, 20 + s * 3, 90, 934),
+    cy: detCoord(p, e, 21 + s * 3, 90, 934),
+    r: 2 + det(p, e, 22 + s * 3, 6),
+    color: s % 2 === 0 ? '#FFFFFF' : emotion.color,
+    op: (0.35 + det(p, e, 40 + s, 45) / 100).toFixed(2),
+  }));
 
   const orbsXml = orbs
-    .map(
-      (o) =>
-        `    <circle cx="${o.cx}" cy="${o.cy}" r="${o.r}" fill="${o.color}" filter="url(#orbBlur)" opacity="0.55"/>`,
-    )
+    .map((o) => `    <circle cx="${o.cx}" cy="${o.cy}" r="${o.r}" fill="${o.color}" filter="url(#${o.blur})" opacity="${o.op}"/>`)
+    .join('\n');
+  const starsXml = stars
+    .map((s) => `    <circle cx="${s.cx}" cy="${s.cy}" r="${s.r}" fill="${s.color}" filter="url(#starBlur)" opacity="${s.op}"/>`)
     .join('\n');
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <radialGradient id="mainGlow" cx="${mainCxPct}%" cy="${mainCyPct}%" r="70%">
-      <stop offset="0%" stop-color="${preset.main}" stop-opacity="0.55"/>
-      <stop offset="55%" stop-color="${preset.main}" stop-opacity="0.18"/>
+    <linearGradient id="topWash" x1="0" y1="0" x2="0.25" y2="1">
+      <stop offset="0%" stop-color="${preset.main}" stop-opacity="0.16"/>
+      <stop offset="55%" stop-color="${preset.base}" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.35"/>
+    </linearGradient>
+    <radialGradient id="mainGlow" cx="${pct(mainCx)}%" cy="${pct(mainCy)}%" r="62%">
+      <stop offset="0%" stop-color="${preset.main}" stop-opacity="0.6"/>
+      <stop offset="45%" stop-color="${preset.main}" stop-opacity="0.18"/>
       <stop offset="100%" stop-color="${preset.main}" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="vignette" cx="50%" cy="50%" r="75%">
-      <stop offset="55%" stop-color="#000000" stop-opacity="0"/>
-      <stop offset="100%" stop-color="#000000" stop-opacity="0.85"/>
+    <radialGradient id="emoGlow" cx="${pct(emoCx)}%" cy="${pct(emoCy)}%" r="50%">
+      <stop offset="0%" stop-color="${emotion.color}" stop-opacity="0.42"/>
+      <stop offset="55%" stop-color="${emotion.color}" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="${emotion.color}" stop-opacity="0"/>
     </radialGradient>
-    <filter id="orbBlur" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="80"/>
-    </filter>
-    <filter id="grain" x="0" y="0" width="100%" height="100%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>
-    </filter>
+    <radialGradient id="topLight" cx="50%" cy="4%" r="55%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="50%" cy="46%" r="72%">
+      <stop offset="58%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.72"/>
+    </radialGradient>
+    <filter id="orbBlur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="90"/></filter>
+    <filter id="softBlur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="42"/></filter>
+    <filter id="starBlur" x="-400%" y="-400%" width="900%" height="900%"><feGaussianBlur stdDeviation="3"/></filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/></filter>
   </defs>
   <!-- 1. 深色底 -->
   <rect width="1024" height="1024" fill="${preset.base}"/>
-  <!-- 2. 预设主色大径向辉光铺底 -->
+  <!-- 2. 主色/情绪色双径向辉光 -->
   <rect width="1024" height="1024" fill="url(#mainGlow)"/>
-  <!-- 3. 2 辅色 + 1 情绪色 模糊 orb -->
+  <rect width="1024" height="1024" fill="url(#emoGlow)"/>
+  <!-- 3. 4 个柔和 orb -->
 ${orbsXml}
-  <!-- 4. feTurbulence 颗粒层（~8% 不透明度） -->
-  <rect width="1024" height="1024" filter="url(#grain)" opacity="0.08"/>
-  <!-- 5. 径向暗角 vignette -->
+  <!-- 4. 5 颗微光星点 -->
+${starsXml}
+  <!-- 5. 顶部渐晕（光从上）+ 顶部柔光 -->
+  <rect width="1024" height="1024" fill="url(#topWash)"/>
+  <rect width="1024" height="1024" fill="url(#topLight)"/>
+  <!-- 6. 细颗粒 -->
+  <rect width="1024" height="1024" filter="url(#grain)" opacity="0.05"/>
+  <!-- 7. 柔和暗角 -->
   <rect width="1024" height="1024" fill="url(#vignette)"/>
 </svg>
 `;
 }
 
-// 生成 4 × 5 = 20 张
 const generated = [];
 for (let p = 0; p < PRESETS.length; p++) {
   for (let e = 0; e < EMOTIONS.length; e++) {
-    const slug = PRESETS[p].slug;
-    const key = EMOTIONS[e].key;
-    const filename = `${slug}-${key}.svg`;
-    const svg = generateSVG(p, e);
-    const outPath = join('public', 'seeds', filename);
-    writeFileSync(outPath, svg, 'utf8');
+    const filename = `${PRESETS[p].slug}-${EMOTIONS[e].key}.svg`;
+    writeFileSync(join('public', 'seeds', filename), generateSVG(p, e), 'utf8');
     generated.push(filename);
   }
 }
 
-// 末尾打印生成清单以供验证
 console.log(`已生成 ${generated.length} 张 SVG 种子占位图到 public/seeds/：`);
-for (const name of generated) {
-  console.log(`  - ${name}`);
-}
+for (const name of generated) console.log(`  - ${name}`);

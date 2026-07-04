@@ -45,6 +45,11 @@ export function openDB(): Promise<IDBPDatabase<DreamGateDB>> {
           db.createObjectStore('inspirations', { keyPath: 'dreamId' });
         }
       },
+    }).catch((err) => {
+      // 打开失败（隐私模式禁用 IndexedDB / 配额 / Safari ITP）：不缓存 rejected promise，
+      // 置空以便下次重试，并抛出交由调用方降级处理（否则会永久卡在加载态白屏）。
+      dbPromise = null;
+      throw err;
     });
   }
   return dbPromise;

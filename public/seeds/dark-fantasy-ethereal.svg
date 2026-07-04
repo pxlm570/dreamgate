@@ -1,31 +1,54 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <radialGradient id="mainGlow" cx="49.71%" cy="56.05%" r="70%">
-      <stop offset="0%" stop-color="#EF476F" stop-opacity="0.55"/>
-      <stop offset="55%" stop-color="#EF476F" stop-opacity="0.18"/>
+    <linearGradient id="topWash" x1="0" y1="0" x2="0.25" y2="1">
+      <stop offset="0%" stop-color="#EF476F" stop-opacity="0.16"/>
+      <stop offset="55%" stop-color="#0d0609" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.35"/>
+    </linearGradient>
+    <radialGradient id="mainGlow" cx="49.71%" cy="45.70%" r="62%">
+      <stop offset="0%" stop-color="#EF476F" stop-opacity="0.6"/>
+      <stop offset="45%" stop-color="#EF476F" stop-opacity="0.18"/>
       <stop offset="100%" stop-color="#EF476F" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="vignette" cx="50%" cy="50%" r="75%">
-      <stop offset="55%" stop-color="#000000" stop-opacity="0"/>
-      <stop offset="100%" stop-color="#000000" stop-opacity="0.85"/>
+    <radialGradient id="emoGlow" cx="31.74%" cy="62.99%" r="50%">
+      <stop offset="0%" stop-color="#C9B8E8" stop-opacity="0.42"/>
+      <stop offset="55%" stop-color="#C9B8E8" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#C9B8E8" stop-opacity="0"/>
     </radialGradient>
-    <filter id="orbBlur" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="80"/>
-    </filter>
-    <filter id="grain" x="0" y="0" width="100%" height="100%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>
-    </filter>
+    <radialGradient id="topLight" cx="50%" cy="4%" r="55%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="50%" cy="46%" r="72%">
+      <stop offset="58%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.72"/>
+    </radialGradient>
+    <filter id="orbBlur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="90"/></filter>
+    <filter id="softBlur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="42"/></filter>
+    <filter id="starBlur" x="-400%" y="-400%" width="900%" height="900%"><feGaussianBlur stdDeviation="3"/></filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/></filter>
   </defs>
   <!-- 1. 深色底 -->
-  <rect width="1024" height="1024" fill="#0d0608"/>
-  <!-- 2. 预设主色大径向辉光铺底 -->
+  <rect width="1024" height="1024" fill="#0d0609"/>
+  <!-- 2. 主色/情绪色双径向辉光 -->
   <rect width="1024" height="1024" fill="url(#mainGlow)"/>
-  <!-- 3. 2 辅色 + 1 情绪色 模糊 orb -->
-    <circle cx="787" cy="263" r="371" fill="#EF476F" filter="url(#orbBlur)" opacity="0.55"/>
-    <circle cx="403" cy="543" r="365" fill="#6A0572" filter="url(#orbBlur)" opacity="0.55"/>
-    <circle cx="683" cy="824" r="339" fill="#C9B8E8" filter="url(#orbBlur)" opacity="0.55"/>
-  <!-- 4. feTurbulence 颗粒层（~8% 不透明度） -->
-  <rect width="1024" height="1024" filter="url(#grain)" opacity="0.08"/>
-  <!-- 5. 径向暗角 vignette -->
+  <rect width="1024" height="1024" fill="url(#emoGlow)"/>
+  <!-- 3. 4 个柔和 orb -->
+    <circle cx="837" cy="195" r="471" fill="#EF476F" filter="url(#orbBlur)" opacity="0.5"/>
+    <circle cx="384" cy="594" r="385" fill="#6A0572" filter="url(#orbBlur)" opacity="0.42"/>
+    <circle cx="699" cy="852" r="239" fill="#C9B8E8" filter="url(#orbBlur)" opacity="0.5"/>
+    <circle cx="572" cy="583" r="257" fill="#EF476F" filter="url(#softBlur)" opacity="0.5"/>
+  <!-- 4. 5 颗微光星点 -->
+    <circle cx="691" cy="869" r="7" fill="#FFFFFF" filter="url(#starBlur)" opacity="0.58"/>
+    <circle cx="382" cy="560" r="4" fill="#C9B8E8" filter="url(#starBlur)" opacity="0.44"/>
+    <circle cx="916" cy="250" r="7" fill="#FFFFFF" filter="url(#starBlur)" opacity="0.75"/>
+    <circle cx="606" cy="784" r="4" fill="#C9B8E8" filter="url(#starBlur)" opacity="0.61"/>
+    <circle cx="296" cy="474" r="7" fill="#FFFFFF" filter="url(#starBlur)" opacity="0.47"/>
+  <!-- 5. 顶部渐晕（光从上）+ 顶部柔光 -->
+  <rect width="1024" height="1024" fill="url(#topWash)"/>
+  <rect width="1024" height="1024" fill="url(#topLight)"/>
+  <!-- 6. 细颗粒 -->
+  <rect width="1024" height="1024" filter="url(#grain)" opacity="0.05"/>
+  <!-- 7. 柔和暗角 -->
   <rect width="1024" height="1024" fill="url(#vignette)"/>
 </svg>

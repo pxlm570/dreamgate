@@ -3,7 +3,7 @@
  * 4 个预设：prompt 关键词 + CSS 色调滤镜 + 情绪适配。
  * prompt 固化 + CSS filter 保证画廊一致性。
  */
-import type { AestheticPresetEntry, AestheticPresetName } from './types';
+import type { AestheticPresetEntry } from './types';
 
 export const AESTHETIC_PRESETS: AestheticPresetEntry[] = [
   {

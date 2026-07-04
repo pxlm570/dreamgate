@@ -104,7 +104,7 @@ export function PrivacyInfo({ open, onClose }: PrivacyInfoProps) {
                 </Body>
                 <ul className="mt-2 space-y-1 text-sm text-dreamgate-text-secondary">
                   <li>· Pollinations：基于梦境片段生成插画 prompt（含原文摘录）</li>
-                  <li>· SiliconFlow：解析梦境原文的情绪与符号</li>
+                  <li>· 大模型解析服务：解析梦境原文的情绪与符号</li>
                 </ul>
                 <Body as="p" className="mt-2 text-xs leading-relaxed text-dreamgate-text-muted">
                   你可拒绝 AI 解析，仅使用本地规则解析与种子图，梦境原文不会外发。

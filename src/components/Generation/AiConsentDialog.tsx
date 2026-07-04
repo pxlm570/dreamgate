@@ -1,5 +1,5 @@
 // AiConsentDialog — AI 同意 dialog（Task 4 隐私最小可用版）
-// 说明数据外发 Pollinations（图像 prompt）/ SiliconFlow（原文解析）
+// 说明数据外发 Pollinations（图像 prompt）/ 大模型解析服务（原文解析）
 // "同意并生成" → setMeta({aiConsent:true}) 走 AI；"仅本地解析" → 走规则降级 + 种子图
 
 import { motion, AnimatePresence } from "framer-motion";
@@ -72,7 +72,7 @@ export function AiConsentDialog({
                   className="mt-0.5 shrink-0 text-dreamgate-ethereal/70"
                 />
                 <span>
-                  <span className="text-dreamgate-text-primary">SiliconFlow</span>
+                  <span className="text-dreamgate-text-primary">大模型解析服务</span>
                   ：解析原文的情绪与符号
                 </span>
               </li>
@@ -81,7 +81,7 @@ export function AiConsentDialog({
                   size={14}
                   className="mt-0.5 shrink-0 text-dreamgate-ethereal/70"
                 />
-                <span>数据仅用于本次生成，不在外部留存</span>
+                <span>本应用不留存你的原文；第三方服务的留存以其隐私政策为准</span>
               </li>
             </ul>
 
@@ -96,7 +96,7 @@ export function AiConsentDialog({
             </div>
 
             <p className="mt-3 text-center text-[11px] text-dreamgate-text-muted">
-              可随时在设置中更改；完整隐私说明见 Task 8
+              拒绝后仅在本地解析，原文不外发；完整隐私说明见页脚「了解详情」
             </p>
           </motion.div>
         </motion.div>

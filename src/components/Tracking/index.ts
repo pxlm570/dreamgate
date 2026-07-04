@@ -6,3 +6,5 @@ export { EmotionDistribution } from "./EmotionDistribution";
 export type { EmotionDistributionProps } from "./EmotionDistribution";
 export { DimensionSummary } from "./DimensionSummary";
 export type { DimensionSummaryProps } from "./DimensionSummary";
+export { CrossDreamInsights } from "./CrossDreamInsights";
+export type { CrossDreamInsightsProps } from "./CrossDreamInsights";

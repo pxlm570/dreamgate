@@ -25,6 +25,8 @@ interface DreamStoreState {
   offlineMode: boolean;
   /** 是否已完成首次加载 */
   loaded: boolean;
+  /** IndexedDB 不可用（隐身模式 / 禁用 / 配额）——数据无法持久化 */
+  storageUnavailable: boolean;
 
   // —— 动作 ——
   /** 从 IndexedDB 加载全部梦境与 meta */
@@ -57,17 +59,30 @@ export const useDreamStore = create<DreamStoreState>((set, get) => ({
   isGenerating: false,
   offlineMode: false,
   loaded: false,
+  storageUnavailable: false,
 
   loadDreams: async () => {
-    const [dreams, meta] = await Promise.all([
-      db.getAllDreams(),
-      db.getMeta(),
-    ]);
-    set({
-      dreams,
-      meta: meta ?? DEFAULT_META,
-      loaded: true,
-    });
+    try {
+      const [dreams, meta] = await Promise.all([
+        db.getAllDreams(),
+        db.getMeta(),
+      ]);
+      set({
+        dreams,
+        meta: meta ?? DEFAULT_META,
+        loaded: true,
+      });
+    } catch (err) {
+      // IndexedDB 不可用：进入降级（空数据 + 默认 meta），但务必置 loaded=true，
+      // 否则 GalleryPage 等会卡在 `if (!loaded)` 永久白屏（隐身窗口即翻车）。
+      console.error('[DreamGate] loadDreams failed (IndexedDB 不可用?):', err);
+      set({
+        dreams: [],
+        meta: DEFAULT_META,
+        loaded: true,
+        storageUnavailable: true,
+      });
+    }
   },
 
   addDream: async (dream) => {

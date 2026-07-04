@@ -4,6 +4,7 @@
 
 import { toPng } from "html-to-image";
 import type { Dream, AestheticPresetName, EmotionTone } from "@/lib/types";
+import { getSeedImage } from "@/lib/seedLibrary";
 import type { CardConfig } from "./types";
 
 /** 分享链接携带的梦境摘要（紧凑键名省 URL 长度） */
@@ -18,32 +19,63 @@ export interface ShareDataSummary {
   d: number;
   /** 美学预设 */
   p: AestheticPresetName;
-  /** 图像 URL（仅 seed 图，避免 Pollinations 长链 + CORS） */
+  /** 图像 URL（seed 路径或 Pollinations 公开 URL，让接收端也能看到藏品） */
   img: string;
   /** 卡片配置 */
   c: CardConfig;
 }
 
-/** 编码：dream + config → base64 字符串 */
+/** base64 → URL-safe（去掉 +、/、= 这些会被 URL/IM 转义或截断的字符） */
+function toUrlSafe(b64: string): string {
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+/** URL-safe → 标准 base64（补回 padding） */
+function fromUrlSafe(s: string): string {
+  let b64 = s.replace(/-/g, "+").replace(/_/g, "/");
+  while (b64.length % 4) b64 += "=";
+  return b64;
+}
+
+/** UTF-8 字符串 → base64（按字节编码，比 encodeURIComponent+btoa 紧凑约 3×，显著缩短分享链接） */
+function utf8ToBase64(str: string): string {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+/** base64 → UTF-8 字符串 */
+function base64ToUtf8(b64: string): string {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+/** 编码：dream + config → URL-safe base64 字符串 */
 export function encodeShareData(dream: Dream, config: CardConfig): string {
   const shareData: ShareDataSummary = {
-    r: dream.rawText.slice(0, config.excerptLength),
+    // 摘录硬上限 80 字，控制链接长度，避免社交平台截断
+    r: dream.rawText.slice(0, Math.min(config.excerptLength ?? 80, 80)),
     e: {
       w: dream.emotion.word,
       i: dream.emotion.intensity,
       t: dream.emotion.tone,
     },
-    s: dream.artifact.symbols.slice(0, 3).map((s) => ({
+    s: dream.artifact.symbols.slice(0, 2).map((s) => ({
       n: s.name,
       p: s.probability,
     })),
     d: dream.createdAt,
     p: dream.aestheticPreset,
-    img: dream.artifact.imageSource === "seed" ? dream.artifact.imageUrl : "",
+    // 携带图片让接收端也能看到藏品：http(s) URL / 种子路径直接带；
+    // data URL（gpt-image base64，动辄 2MB）绝不能进链接 → 退回同情绪种子氛围图
+    img: dream.artifact.imageUrl?.startsWith("data:")
+      ? getSeedImage(dream.aestheticPreset, dream.emotion.word)
+      : (dream.artifact.imageUrl ?? ""),
     c: config,
   };
-  // encodeURIComponent 处理中文，btoa 转 base64
-  return btoa(encodeURIComponent(JSON.stringify(shareData)));
+  // UTF-8 字节 → base64 → URL-safe：紧凑编码，避免双重百分号编码导致超长/解析失败
+  return toUrlSafe(utf8ToBase64(JSON.stringify(shareData)));
 }
 
 /** 解码：base64 → { summary, config }，失败返回 null */
@@ -52,7 +84,7 @@ export function decodeShareData(encoded: string): {
   config: CardConfig;
 } | null {
   try {
-    const json = decodeURIComponent(atob(encoded));
+    const json = base64ToUtf8(fromUrlSafe(encoded));
     const data = JSON.parse(json) as ShareDataSummary;
     if (!data || !data.c) return null;
     return { summary: data, config: data.c };
@@ -68,10 +100,33 @@ export function decodeShareData(encoded: string): {
  */
 export function buildShareUrl(dream: Dream, config: CardConfig): string {
   const encoded = encodeShareData(dream, config);
-  // encodeURIComponent 防止 base64 中的 + 被解析为空格
-  return `${window.location.origin}/#/share/${dream.id}?d=${encodeURIComponent(
-    encoded,
-  )}`;
+  // URL-safe base64 自身即 URL 安全字符（- _），无需再 encodeURIComponent，避免双重编码超长
+  return `${window.location.origin}/#/share/${dream.id}?d=${encoded}`;
+}
+
+/** 复制文本到剪贴板（clipboard API + execCommand 兜底），返回是否成功 */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* 落到 execCommand 兜底 */
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
 }
 
 /** 从 URL ?d= 参数解析分享数据，无则 null */
@@ -101,7 +156,7 @@ export function summaryToDream(
     aestheticPreset: summary.p,
     artifact: {
       imageUrl: summary.img,
-      imageSource: summary.img ? "seed" : "ai",
+      imageSource: summary.img.startsWith("/seeds/") ? "seed" : "ai",
       emotionAnalysis: "",
       symbols: summary.s.map((s) => ({
         name: s.n,

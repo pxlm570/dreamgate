@@ -3,7 +3,7 @@
 // 同样约 2 秒后调用 onComplete，由 GatePage 跳转 /gallery
 
 import { useEffect, useMemo } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { Display, Caption } from "@/components/ui";
 
 export interface CssMirrorFallbackProps {
@@ -134,36 +134,34 @@ export function CssMirrorFallback({
         }}
       />
 
-      {/* 提示文字（idle 时显示） */}
-      <AnimatePresence>
-        {!triggering && (
-          <motion.div
-            className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center px-6"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1.2, delay: 0.3 }}
-          >
-            <motion.div
-              animate={{ opacity: [0.55, 1, 0.55], scale: [1, 1.025, 1] }}
-              transition={{
-                duration: 4.5,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-              className="flex flex-col items-center"
-            >
-              <Display className="text-5xl md:text-7xl font-light tracking-[0.35em] text-dreamgate-text-primary">
-                踏入梦境
-              </Display>
-              <div className="mt-7 h-px w-28 bg-gradient-to-r from-transparent via-dreamgate-ethereal/70 to-transparent" />
-              <Caption className="mt-7 block text-xs md:text-sm tracking-[0.5em] uppercase text-dreamgate-text-secondary">
-                点击 · 或滚动 · 进入
-              </Caption>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* 提示文字（idle 时显示，触发后淡出）——常驻 motion.div，避免 AnimatePresence 首帧 enter 不触发 */}
+      <motion.div
+        className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center px-6"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: triggering ? 0 : 1 }}
+        transition={{
+          duration: triggering ? 0.5 : 1.2,
+          delay: triggering ? 0 : 0.3,
+        }}
+      >
+        <motion.div
+          animate={{ opacity: [0.55, 1, 0.55], scale: [1, 1.025, 1] }}
+          transition={{
+            duration: 4.5,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="flex flex-col items-center"
+        >
+          <Display className="text-5xl md:text-7xl font-light tracking-[0.35em] text-dreamgate-text-primary">
+            踏入梦境
+          </Display>
+          <div className="mt-7 h-px w-28 bg-gradient-to-r from-transparent via-dreamgate-ethereal/70 to-transparent" />
+          <Caption className="mt-7 block text-xs md:text-sm tracking-[0.5em] uppercase text-dreamgate-text-secondary">
+            点击 · 或滚动 · 进入
+          </Caption>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }

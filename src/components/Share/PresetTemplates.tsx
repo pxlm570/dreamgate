@@ -3,11 +3,12 @@
 // 模板：极简（白底黑字）/ 古典（深色金边）/ 迷幻（彩虹渐变）+ 每模板独立导出
 
 import { useRef, useState } from "react";
-import { Download, Image as ImageIcon } from "lucide-react";
+import { Download, Image as ImageIcon, Link as LinkIcon, Check } from "lucide-react";
 import { Button, Caption } from "@/components/ui";
 import { getEmotionByWord } from "@/lib/emotions";
 import { presetToKey } from "@/components/Atmosphere";
-import { toPngExport } from "./shareUtils";
+import { toPngExport, buildShareUrl, copyToClipboard } from "./shareUtils";
+import { DEFAULT_CARD_CONFIG } from "./types";
 import type { Dream } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -40,11 +41,28 @@ const TEMPLATE_BG: Record<TemplateKind, string> = {
 };
 
 export function PresetTemplates({ dream, onExport }: PresetTemplatesProps) {
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const handleCopyLink = async () => {
+    const ok = await copyToClipboard(buildShareUrl(dream, DEFAULT_CARD_CONFIG));
+    if (ok) {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    }
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-      <Caption as="p" className="text-center text-xs text-dreamgate-text-muted">
-        移动端 / 降级模式 · 选择一个预设模板快速导出
-      </Caption>
+      <div className="flex flex-col items-center gap-3">
+        <Caption as="p" className="text-center text-xs text-dreamgate-text-muted">
+          选择一个预设模板导出，或直接复制分享链接
+        </Caption>
+        {/* 移动端/降级模式也能复制分享链接（与设备无关的传播路径） */}
+        <Button variant="primary" size="sm" onClick={handleCopyLink} className="min-w-[200px]">
+          {linkCopied ? <Check size={14} /> : <LinkIcon size={14} />}
+          {linkCopied ? "已复制分享链接" : "复制分享链接"}
+        </Button>
+      </div>
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
         {TEMPLATES.map((tpl) => (
           <TemplateCard key={tpl.kind} meta={tpl} dream={dream} onExport={onExport} />

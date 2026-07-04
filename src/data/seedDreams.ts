@@ -22,8 +22,8 @@ export const SEED_DREAMS: Dream[] = [
     color: '#EF476F',
     tags: ['水', '海边', '灯塔', '无法移动'],
     artifact: {
-      imageUrl: '/seeds/dark-fantasy-anxious.svg',
-      imageSource: 'seed',
+      imageUrl: '/seeds-gen/seed-1.png',
+      imageSource: 'ai',
       emotionAnalysis:
         '这个梦境呈现了典型的"被吞没"焦虑意象。墨蓝深海象征着潜意识中未被面对的情感深渊，海水上涨暗示着情绪压力的累积。脚下沙被冲走反映了现实安全感的不稳定，而无法移动则映射了梦中常见的"睡眠瘫痪"心理机制——理智清醒但情感行动受阻。远处忽明忽暗的灯塔可能代表着摇摆不定的指引或希望，暗示梦者在困境中仍在寻找方向。',
       symbols: [
@@ -44,8 +44,8 @@ export const SEED_DREAMS: Dream[] = [
     color: '#C9B8E8',
     tags: ['水', '雨', '奔跑', '走廊'],
     artifact: {
-      imageUrl: '/seeds/ethereal-anxious.svg',
-      imageSource: 'seed',
+      imageUrl: '/seeds-gen/seed-2.png',
+      imageSource: 'ai',
       emotionAnalysis:
         '暴雨与奔跑构成了强烈的焦虑叙事。雨水浸透衣服象征着外界压力已渗入个人边界，所有门关闭则映射了社会支持系统的暂时缺位。无尽走廊是经典的"过渡空间"意象——梦者处于困境与出口之间，寻找但尚未抵达。与水相关的梦境常出现在情绪超载时期。',
       symbols: [
@@ -66,8 +66,8 @@ export const SEED_DREAMS: Dream[] = [
     color: '#5A189A',
     tags: ['水', '渗水', '无力', '堵缝隙'],
     artifact: {
-      imageUrl: '/seeds/mystical-sad.svg',
-      imageSource: 'seed',
+      imageUrl: '/seeds-gen/seed-3.png',
+      imageSource: 'ai',
       emotionAnalysis:
         '渗水梦境是"失控"主题的经典表达。水位渐进上涨映射着情绪问题的累积性——小问题被忽视后会逐渐扩散。反复堵缝隙却出现新缝隙，揭示了"治标不治本"的心理困境。脚踝水位时的无力绝望，是情绪耗竭的信号。此梦与前两个水主题梦境形成跨梦模式：水反复出现，提示梦者近期可能存在持续的情绪压力源未被处理。',
       symbols: [
@@ -88,8 +88,8 @@ export const SEED_DREAMS: Dream[] = [
     color: '#FFD166',
     tags: ['飞翔', '城市', '自由', '灯火'],
     artifact: {
-      imageUrl: '/seeds/ethereal-excited.svg',
-      imageSource: 'seed',
+      imageUrl: '/seeds-gen/seed-4.png',
+      imageSource: 'ai',
       emotionAnalysis:
         '飞翔是梦境中最普遍的"超越"意象之一。从窗台跃出代表着打破日常框架的勇气，漂浮在城市上空则提供了俯视视角——从更高维度看待生活。卸下重量感与久违的自由，暗示梦者在现实中可能刚刚完成了一次重要的释放或突破。闪烁灯火下方是人间烟火，飞翔者并未逃离，而是获得了重新审视的距离。',
       symbols: [
@@ -110,8 +110,8 @@ export const SEED_DREAMS: Dream[] = [
     color: '#6A0572',
     tags: ['坠落', '高塔', '楼梯消失', '心跳'],
     artifact: {
-      imageUrl: '/seeds/dark-fantasy-anxious.svg',
-      imageSource: 'seed',
+      imageUrl: '/seeds-gen/seed-5.png',
+      imageSource: 'ai',
       emotionAnalysis:
         '坠落梦是仅次于飞翔的高频梦境主题。楼梯消失象征着原有支撑结构的突然失效——可能是现实中的某种安全感崩塌。试图抓住却抓不到，反映了失控感中的无助。即将触地时惊醒是典型的"坠落惊醒"机制，与生理上的肌张力变化有关。心跳加速是身体对梦境恐惧的真实生理反应。',
       symbols: [
