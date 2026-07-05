@@ -1,10 +1,11 @@
-// GenerationProgress — 生成进度 UI（Task 4.6 渐进式呈现）
-// 三阶段指示器：① 图像生成中（骨架屏 + 进度条）② 解析中（spinner）③ 完成
-// 显示 fallback 状态徽章（种子图 / 规则解析 / 离线）
+// GenerationProgress — 「显影」舞台（Task 4.6 渐进式呈现 · 画即世界版）
+// 把最长的等待（gpt-image ~40s）变成最有仪式感的一幕：
+// 暗房静置 → 影像自深度模糊/低饱和中缓缓「显影」成型 → 扫光走过 → 落款。
+// 不用机械进度条思维：显影动画本身就是进度的叙事。
 
-import { type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Image as ImageIcon, Sparkles, CheckCircle2, CloudOff } from "lucide-react";
+import { Image as ImageIcon, Sparkles, CloudOff } from "lucide-react";
 import { Caption, Mono } from "@/components/ui";
 import { presetToKey } from "@/components/Atmosphere";
 import { cn } from "@/lib/utils";
@@ -21,10 +22,17 @@ export interface GenerationProgressProps {
 }
 
 const STAGES = [
-  { key: "image", label: "图像生成" },
-  { key: "analysis", label: "梦境解析" },
-  { key: "done", label: "完成" },
+  { key: "image", label: "显影" },
+  { key: "analysis", label: "辨纹" },
+  { key: "done", label: "落款" },
 ] as const;
+
+const PHASE_COPY: Record<string, { main: string; sub: string }> = {
+  idle: { main: "暗房准备中……", sub: "为这场梦腾出一方安静" },
+  image: { main: "梦境正在显影……", sub: "影像自模糊深处缓缓浮现，请稍候" },
+  analysis: { main: "正在辨认梦的纹理与符号……", sub: "情绪的走向、意象的重量，逐一落笔" },
+  done: { main: "藏品落款完成", sub: "这场梦已被永久收藏" },
+};
 
 const BADGE_CLS: Record<string, string> = {
   amber: "border-amber-400/30 bg-amber-400/10 text-amber-200/80",
@@ -44,96 +52,113 @@ export function GenerationProgress({
   phase, previewUrl, preset, imageFallback, analysisFallback, offline, onImageError,
 }: GenerationProgressProps) {
   const filterClass = `preset-${presetToKey[preset]}`;
-  const activeIdx = STAGES.findIndex((s) => s.key === phase);
+  const activeIdx = Math.max(STAGES.findIndex((s) => s.key === phase), 0);
+  // 显影：图片加载完成前保持深度模糊态；URL 变化（fallback 换图）时重新显影
+  const [developed, setDeveloped] = useState(false);
+  useEffect(() => {
+    setDeveloped(false);
+  }, [previewUrl]);
+  const copy = PHASE_COPY[phase] ?? PHASE_COPY.idle;
 
   return (
-    <div className="flex flex-col items-center gap-6 py-8">
-      {/* 图像区：骨架屏 / 真图 */}
-      <div className="relative aspect-square w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-dreamgate-elevated/40 shadow-[0_0_60px_-15px_rgba(201,184,232,0.4)]">
+    <div className="flex flex-col items-center gap-7 py-6">
+      {/* ===== 显影台：暗房里的相纸 ===== */}
+      <div className="relative aspect-square w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a14] shadow-[0_0_80px_-20px_rgba(201,184,232,0.35)]">
         {previewUrl ? (
           <img
+            key={previewUrl}
             src={previewUrl}
-            alt="梦境插画生成中"
+            alt="梦境显影中"
             onError={onImageError}
+            onLoad={() => setDeveloped(true)}
             className={cn("h-full w-full object-cover", filterClass)}
+            style={{
+              filter: developed ? "blur(0px) saturate(1)" : "blur(28px) saturate(0.55)",
+              transform: developed ? "scale(1)" : "scale(1.1)",
+              opacity: developed ? 1 : 0.82,
+              transition:
+                "filter 2.6s cubic-bezier(0.22,1,0.36,1), transform 2.6s cubic-bezier(0.22,1,0.36,1), opacity 1.4s ease-out",
+            }}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
+            {/* 暗房呼吸：无图时不放骨架屏，放一团缓慢呼吸的微光（相纸在药液中静置） */}
             <motion.div
-              animate={{ opacity: [0.3, 0.6, 0.3] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              className="flex flex-col items-center gap-2 text-dreamgate-ethereal/50"
-            >
-              <ImageIcon size={28} />
-              <Caption>正在召唤图像…</Caption>
-            </motion.div>
+              animate={{ opacity: [0.16, 0.4, 0.16], scale: [1, 1.12, 1] }}
+              transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
+              className="h-44 w-44 rounded-full"
+              style={{ background: "radial-gradient(circle, rgba(201,184,232,0.5), rgba(139,92,246,0.14) 55%, transparent 72%)" }}
+            />
+            <Caption as="div" className="absolute bottom-6 text-[11px] tracking-[0.3em]">
+              暗房静置中
+            </Caption>
           </div>
         )}
+        {/* 扫光：一道柔光缓缓扫过相纸（显影液流过的光泽），完成后停止 */}
         {phase !== "done" && (
           <motion.div
-            className="pointer-events-none absolute inset-0 bg-gradient-to-t from-dreamgate-elevated/60 via-transparent to-transparent"
-            animate={{ opacity: [0.4, 0.7, 0.4] }}
-            transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 w-1/3"
+            style={{ background: "linear-gradient(105deg, transparent, rgba(255,255,255,0.07) 45%, rgba(201,184,232,0.1) 55%, transparent)" }}
+            animate={{ left: ["-40%", "110%"] }}
+            transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut", repeatDelay: 1.1 }}
           />
         )}
+        {/* 边缘暗角：相纸四周沉入暗房 */}
+        <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_70px_rgba(0,0,0,0.55)]" />
       </div>
 
-      {/* 阶段指示器 */}
-      <div className="flex w-full max-w-md items-center justify-between gap-1">
+      {/* ===== 阶段词：显影 · 辨纹 · 落款（美术馆图录语言，替代机械进度条） ===== */}
+      <div className="flex items-center gap-4">
         {STAGES.map((s, i) => {
-          const isActive = i === activeIdx;
+          const isActive = i === activeIdx && phase !== "done";
           const isDone = i < activeIdx || phase === "done";
           return (
-            <div key={s.key} className="flex flex-1 items-center gap-2">
-              <div
-                className={cn(
-                  "flex h-7 w-7 items-center justify-center rounded-full border text-[11px] transition-all",
-                  isDone
-                    ? "border-dreamgate-ethereal/60 bg-dreamgate-ethereal/15 text-dreamgate-ethereal"
-                    : isActive
-                      ? "border-dreamgate-ethereal/40 text-dreamgate-ethereal"
-                      : "border-white/10 text-dreamgate-text-muted",
-                )}
-              >
-                {isDone ? <CheckCircle2 size={13} /> : isActive ? <Loader2 size={13} className="animate-spin" /> : <span>{i + 1}</span>}
+            <div key={s.key} className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <motion.span
+                  className="h-1.5 w-1.5 rounded-full"
+                  animate={
+                    isActive
+                      ? { opacity: [0.5, 1, 0.5], scale: [1, 1.35, 1] }
+                      : { opacity: isDone ? 1 : 0.25, scale: 1 }
+                  }
+                  transition={isActive ? { duration: 1.6, repeat: Infinity, ease: "easeInOut" } : { duration: 0.4 }}
+                  style={{
+                    background: isActive || isDone ? "#c9b8e8" : "rgba(255,255,255,0.35)",
+                    boxShadow: isActive || isDone ? "0 0 8px rgba(201,184,232,0.9)" : "none",
+                  }}
+                />
+                <Mono
+                  className={cn(
+                    "text-[11px] tracking-[0.3em] transition-colors duration-500",
+                    isActive || isDone ? "text-dreamgate-text-primary" : "text-dreamgate-text-muted",
+                  )}
+                >
+                  {s.label}
+                </Mono>
               </div>
-              <Mono className={cn("text-[11px]", isActive || isDone ? "text-dreamgate-text-primary" : "text-dreamgate-text-muted")}>
-                {s.label}
-              </Mono>
-              {i < STAGES.length - 1 && <div className="mx-1 h-px flex-1 bg-white/8" />}
+              {i < STAGES.length - 1 && <span className="h-px w-8 bg-white/12" />}
             </div>
           );
         })}
       </div>
 
-      {/* 进度条 */}
-      <div className="h-1 w-full max-w-md overflow-hidden rounded-full bg-white/5">
-        <motion.div
-          className="h-full bg-gradient-to-r from-dreamgate-ethereal/70 to-dreamgate-mystical/70"
-          animate={{ width: phase === "image" ? "40%" : phase === "analysis" ? "75%" : phase === "done" ? "100%" : "15%" }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-        />
-      </div>
-
-      {/* 当前阶段说明 + fallback 徽章 */}
-      <div className="flex flex-col items-center gap-2">
+      {/* ===== 诗性阶段文案 + fallback 徽章 ===== */}
+      <div className="flex flex-col items-center gap-3">
         <AnimatePresence mode="wait">
           <motion.div
             key={phase}
-            initial={{ opacity: 0, y: 6 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.3 }}
-            className="flex items-center gap-2 text-dreamgate-text-secondary"
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="flex flex-col items-center gap-1.5 text-center"
           >
-            {phase === "image" && <Sparkles size={13} className="text-dreamgate-ethereal" />}
-            {phase === "analysis" && <Loader2 size={13} className="animate-spin text-dreamgate-ethereal" />}
-            <Caption as="span" className="text-sm">
-              {phase === "image" && "正在生成梦境插画…"}
-              {phase === "analysis" && "正在解析情绪与符号…"}
-              {phase === "done" && "藏品已生成"}
-              {phase === "idle" && "准备中…"}
-            </Caption>
+            <span className="font-display text-lg tracking-wide text-dreamgate-text-primary">
+              {copy.main}
+            </span>
+            <Caption as="span" className="text-[11px]">{copy.sub}</Caption>
           </motion.div>
         </AnimatePresence>
 

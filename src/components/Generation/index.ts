@@ -8,5 +8,7 @@ export { GenerationProgress } from "./GenerationProgress";
 export type { GenerationProgressProps } from "./GenerationProgress";
 export { ArtifactView } from "./ArtifactView";
 export type { ArtifactViewProps } from "./ArtifactView";
+export { DreamImmersive } from "./DreamImmersive";
+export type { DreamImmersiveProps } from "./DreamImmersive";
 export { GenerationOrchestrator } from "./GenerationOrchestrator";
 export type { GenerationOrchestratorProps } from "./GenerationOrchestrator";

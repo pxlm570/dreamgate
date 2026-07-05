@@ -396,6 +396,7 @@ function MirrorAndCamera({
   act: 0 | 1;
 }) {
   const mirrorRef = useRef<THREE.Mesh>(null);
+  const portalRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
   const { camera, scene } = useThree();
 
@@ -442,6 +443,19 @@ function MirrorAndCamera({
         0,
       );
     }
+    // 飞入画中：碎镜的同时，镜后「画界」显影——同一幅梦境图放大成整个视野，
+    // 相机推进到它跟前时画面被图完全充满 = 坠入图中（内容即是转场本身）
+    if (portalRef.current) {
+      const pm = portalRef.current.material as THREE.MeshBasicMaterial;
+      portalRef.current.visible = true;
+      pm.opacity = 0;
+      tl.to(pm, { opacity: 1, duration: 1.05, ease: "power2.out" }, 0.22);
+      tl.to(
+        portalRef.current.scale,
+        { x: 1.22, y: 1.22, duration: 1.9, ease: "power1.inOut" },
+        0.1,
+      );
+    }
     if (fog) {
       tl.to(fog, { density: 0.34, duration: 1.8, ease: "power2.in" }, 0);
     }
@@ -467,6 +481,12 @@ function MirrorAndCamera({
       <mesh ref={mirrorRef} position={[0, 0, 0]}>
         <planeGeometry args={[2, 3]} />
         <meshBasicMaterial map={nebula} />
+      </mesh>
+      {/* 「画界」：碎镜后在镜后显影的整幅梦境图（与镜面同源），相机坠入其中。
+          fog=false 保画面鲜活（穿雾时不被灰化）；平时隐藏零开销 */}
+      <mesh ref={portalRef} visible={false} position={[0, 0, -3.6]}>
+        <planeGeometry args={[7.2, 10.8]} />
+        <meshBasicMaterial map={nebula} transparent opacity={0} fog={false} depthWrite={false} />
       </mesh>
     </group>
   );
