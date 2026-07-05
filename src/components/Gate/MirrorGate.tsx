@@ -9,6 +9,7 @@ import { MeshReflectorMaterial, RoundedBox } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import gsap from "gsap";
+import { useOptionalTexture } from "@/hooks/useOptionalTexture";
 
 const FOG_COLOR = "#0a0a14";
 const ACCENT = "#c9b8e8";
@@ -475,6 +476,10 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
   const glow = useMemo(makeGlowTexture, []);
   const shaft = useMemo(makeShaftTexture, []);
   const nebula = useMemo(makeNebulaTexture, []);
+  // 镜中真画：gpt-image 生成的「门中梦境世界」（有作者的内容才是视觉主角）；
+  // 未加载/缺图时回退程序星云，碎镜与镜面同源（碎的就是这幅画）
+  const dreamTex = useOptionalTexture("/textures/mirror-dream.png");
+  const mirrorTex = dreamTex ?? nebula;
   return (
     <Canvas
       camera={{ position: [0, 0, 6], fov: 50 }}
@@ -532,8 +537,8 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
         />
       </mesh>
       <MirrorFrame glow={glow} />
-      <MirrorAndCamera triggering={triggering} onComplete={onComplete} nebula={nebula} act={act} />
-      <Shards triggered={triggering} nebula={nebula} />
+      <MirrorAndCamera triggering={triggering} onComplete={onComplete} nebula={mirrorTex} act={act} />
+      <Shards triggered={triggering} nebula={mirrorTex} />
       <DreamParticles texture={glow} />
       {/* 后处理：Bloom 辉光 + Vignette 暗角，电影感 */}
       <EffectComposer>

@@ -60,18 +60,28 @@ export function GateOverlay({ visible, act = 1 }: GateOverlayProps) {
           DREAMGATE
         </div>
 
-        {/* 主标题：字符级分步 blur 揭示（克制而优雅的尺度 + 宽字距，不与镜面争焦点） */}
-        <Display className="flex pl-[0.32em] font-extralight leading-none tracking-[0.32em] text-[clamp(2.75rem,6.5vw,5rem)] text-dreamgate-text-primary">
-          {TITLE_CHARS.map((ch, i) => (
-            <span
-              key={i}
-              className="animate-gate-rise inline-block"
-              style={{ animationDelay: `${0.6 + i * 0.14}s` }}
-            >
-              {ch}
-            </span>
-          ))}
-        </Display>
+        {/* 主标题：字符级分步 blur 揭示。
+            noomo 式排版分幕：幕0 = 打字海报（标题放大为画面主角，门小立远景）；
+            幕1 = 物体特写（标题收回让位给镜面）。GPU scale 过渡与相机运镜同步。 */}
+        <div
+          style={{
+            transform: `scale(${act === 0 ? 1.8 : 1})`,
+            transition: "transform 1.7s cubic-bezier(0.22,1,0.36,1)",
+            transformOrigin: "center 60%",
+          }}
+        >
+          <Display className="flex pl-[0.32em] font-extralight leading-none tracking-[0.32em] text-[clamp(2.75rem,6.5vw,5rem)] text-dreamgate-text-primary">
+            {TITLE_CHARS.map((ch, i) => (
+              <span
+                key={i}
+                className="animate-gate-rise inline-block"
+                style={{ animationDelay: `${0.6 + i * 0.14}s` }}
+              >
+                {ch}
+              </span>
+            ))}
+          </Display>
+        </div>
 
         {/* 分幕文案区（固定高度避免布局跳动）：
             幕0 = 靠近提示；幕1 = 分隔线 + 副文案 + 踏入提示。

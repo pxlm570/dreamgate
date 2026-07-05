@@ -4,7 +4,7 @@
 
 import { useMemo, useRef, type RefObject } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { MeshReflectorMaterial, Html } from "@react-three/drei";
+import { MeshReflectorMaterial } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import type { Dream } from "@/lib/types";
@@ -19,6 +19,31 @@ const CORRIDOR_HALF_HEIGHT = 3;
 /** hex 基底 + accent 按比例混合，返回 three.Color */
 function mixColor(base: string, accent: string, ratio: number): THREE.Color {
   return new THREE.Color(base).lerp(new THREE.Color(accent), ratio);
+}
+
+/** 尽头文案贴图：一次性绘制（Html 会每帧写 DOM transform——滚动抖动源之一） */
+function makeEndTextTexture(): { tex: THREE.CanvasTexture; aspect: number } {
+  const S = 2;
+  const w = 720;
+  const h = 150;
+  const canvas = document.createElement("canvas");
+  canvas.width = w * S;
+  canvas.height = h * S;
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(S, S);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.font = '300 44px "ZCOOL XiaoWei", "Noto Serif SC", serif';
+  ctx.fillStyle = "rgba(240,238,248,0.8)";
+  ctx.fillText("仍 未 发 现 的 梦 境 … …", w / 2, 18);
+  ctx.font = '400 15px "JetBrains Mono", ui-monospace, monospace';
+  ctx.fillStyle = "rgba(255,255,255,0.28)";
+  ctx.fillText("T H E   U N F O U N D   D R E A M S", w / 2, 100);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  return { tex, aspect: w / h };
 }
 
 /** 径向柔光贴图（白核→透明），用于走廊尽头的柔和光晕焦点 */
@@ -85,6 +110,7 @@ function CorridorWalls({ length, accentColor, glowTex }: { length: number; accen
   // （之前 +16 会在尽头露出背景色的方形截面——「字的背景像塑料板」的元凶）
   const wallLen = length + 90;
   const centerZ = -length / 2 - 25;
+  const endText = useMemo(makeEndTextTexture, []);
   return (
     <group>
       {/* 地板：深色反射地面（光池/画作倒影承担空间感） */}
@@ -155,23 +181,10 @@ function CorridorWalls({ length, accentColor, glowTex }: { length: number; accen
           depthWrite={false}
         />
       </mesh>
-      {/* 尽头文案：给「仍未被发现的梦境」留白想象，而非被墙挡住 */}
-      <Html
-        position={[0, 0.15, -length - 6.5]}
-        center
-        distanceFactor={9}
-        pointerEvents="none"
-        zIndexRange={[6, 0]}
-      >
-        <div className="select-none whitespace-nowrap text-center">
-          <p className="font-display text-3xl tracking-[0.26em] text-white/75 text-glow-soft">
-            仍未发现的梦境……
-          </p>
-          <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.45em] text-white/25">
-            the unfound dreams
-          </p>
-        </div>
-      </Html>
+      {/* 尽头文案：canvas sprite（一次绘制零每帧成本），飘在柔光深处 */}
+      <sprite position={[0, 0.15, -length - 6.5]} scale={[5.6, 5.6 / endText.aspect, 1]}>
+        <spriteMaterial map={endText.tex} transparent opacity={0.9} depthWrite={false} />
+      </sprite>
     </group>
   );
 }
@@ -198,16 +211,22 @@ function CameraRig({
   const { camera } = useThree();
   const startZ = 4;
   const endZ = -length - 4;
-  useFrame((state) => {
+  // 注：平滑一律用 damp（帧率无关的指数衰减）。固定系数 lerp 在帧率波动时
+  // 平滑量逐帧不同（重场景帧率不稳），叠加 Lenis 自身平滑即产生肉眼可见的滚动抖动。
+  useFrame((state, delta) => {
+    const dt = Math.min(delta, 0.05); // 掐掉超长帧尖峰，防跳变
     if (focusTarget) {
       // 聚焦：相机移到门前（距门约 2.7），正对门面，带极轻指针视差保留呼吸感
       const camX = focusTarget.side * (DOOR_OFFSET_X - 2.7);
       const px = reduceMotion ? 0 : state.pointer.x * 0.08;
       const py = reduceMotion ? 0 : state.pointer.y * 0.06;
-      const ease = reduceMotion ? 1 : 0.07;
-      camera.position.x = THREE.MathUtils.lerp(camera.position.x, camX + px, ease);
-      camera.position.y = THREE.MathUtils.lerp(camera.position.y, 0.1 + py, ease);
-      camera.position.z = THREE.MathUtils.lerp(camera.position.z, focusTarget.z, ease);
+      if (reduceMotion) {
+        camera.position.set(camX, 0.1, focusTarget.z);
+      } else {
+        camera.position.x = THREE.MathUtils.damp(camera.position.x, camX + px, 4.5, dt);
+        camera.position.y = THREE.MathUtils.damp(camera.position.y, 0.1 + py, 4.5, dt);
+        camera.position.z = THREE.MathUtils.damp(camera.position.z, focusTarget.z, 4.5, dt);
+      }
       camera.lookAt(focusTarget.x, 0, focusTarget.z);
       return;
     }
@@ -218,11 +237,12 @@ function CameraRig({
       camera.position.x = 0;
       camera.position.y = 0;
     } else {
-      camera.position.z = THREE.MathUtils.lerp(camera.position.z, targetZ, 0.12);
-      camera.position.x = THREE.MathUtils.lerp(camera.position.x, state.pointer.x * 0.45, 0.05);
-      camera.position.y = THREE.MathUtils.lerp(camera.position.y, state.pointer.y * 0.25, 0.05);
+      camera.position.z = THREE.MathUtils.damp(camera.position.z, targetZ, 8, dt);
+      camera.position.x = THREE.MathUtils.damp(camera.position.x, state.pointer.x * 0.45, 3, dt);
+      camera.position.y = THREE.MathUtils.damp(camera.position.y, state.pointer.y * 0.25, 3, dt);
     }
-    camera.lookAt(0, 0, targetZ - 4);
+    // 朝向跟随相机自身的平滑 z（跟未平滑的 targetZ 会让朝向领先位置，产生微晃）
+    camera.lookAt(0, 0, camera.position.z - 8);
   });
   return null;
 }
