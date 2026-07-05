@@ -214,17 +214,64 @@ export function DreamDoor({
         />
       </mesh>
 
-      {/* 门框：细边金属画框（宽框+高发光显塑料；细框+低静息发光更像美术馆画框） */}
-      <mesh position={[0, 0, -0.06]}>
-        <boxGeometry args={[DOOR_W + 0.18, DOOR_H + 0.18, 0.1]} />
+      {/* —— 真实画廊装裱语言：深色外框 + 暖白卡纸 + 画作 ——
+          「室内感」靠建筑/装裱线索（框、卡纸、射灯、洗墙光），不靠墙面贴图 */}
+      {/* 外框：深色装裱框 */}
+      <mesh position={[0, 0, -0.08]}>
+        <boxGeometry args={[DOOR_W + 0.5, DOOR_H + 0.5, 0.06]} />
         <meshStandardMaterial
-          color="#08080f"
-          metalness={0.85}
-          roughness={0.24}
+          color="#0b0b13"
+          metalness={0.45}
+          roughness={0.55}
           emissive={emotionColor}
-          emissiveIntensity={lit ? 0.7 : 0.16}
+          emissiveIntensity={lit ? 0.28 : 0.06}
         />
       </mesh>
+      {/* 卡纸（mat）：暖白内衬——画作被「装裱」而非悬浮 */}
+      <mesh position={[0, 0, -0.02]}>
+        <planeGeometry args={[DOOR_W + 0.26, DOOR_H + 0.26]} />
+        <meshStandardMaterial
+          color="#d9d4c8"
+          roughness={0.92}
+          metalness={0}
+          emissive="#fffdf5"
+          emissiveIntensity={lit ? 0.14 : 0.07}
+        />
+      </mesh>
+      {/* 射灯洗墙光：从画上方倾泻在墙上的暖白光斑（美术馆 track light 打在墙面） */}
+      {glowTex && (
+        <mesh position={[0, 1.1, -0.1]} scale={[3.6, 4.4, 1]}>
+          <planeGeometry args={[1, 1]} />
+          <meshBasicMaterial
+            map={glowTex}
+            color="#efe8ff"
+            transparent
+            opacity={lit ? 0.17 : 0.1}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+      {/* 射灯灯具：吊杆 + 灯筒 + 发光灯口（可见光源=室内感的最强线索） */}
+      <group position={[0, DOOR_H / 2 + 1.0, 0.55]}>
+        {/* 吊杆（接天花板） */}
+        <mesh position={[0, 0.35, 0]}>
+          <cylinderGeometry args={[0.012, 0.012, 0.5, 8]} />
+          <meshStandardMaterial color="#15151f" metalness={0.7} roughness={0.4} />
+        </mesh>
+        {/* 灯筒：斜指画面 */}
+        <group rotation={[Math.PI / 5, 0, 0]}>
+          <mesh>
+            <cylinderGeometry args={[0.055, 0.075, 0.22, 12]} />
+            <meshStandardMaterial color="#191924" metalness={0.75} roughness={0.35} />
+          </mesh>
+          {/* 灯口亮点（Bloom 出光晕） */}
+          <mesh position={[0, -0.115, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[0.05, 12]} />
+            <meshBasicMaterial color="#fff3da" />
+          </mesh>
+        </group>
+      </group>
 
       {/* 门面板：图像 / 纯色 */}
       <group

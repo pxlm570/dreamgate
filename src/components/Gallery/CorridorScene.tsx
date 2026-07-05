@@ -119,6 +119,21 @@ function CorridorWalls({ length, accentColor, glowTex }: { length: number; accen
         <planeGeometry args={[wallLen, 6]} />
         <meshStandardMaterial color="#07070e" metalness={0.06} roughness={0.9} />
       </mesh>
+      {/* —— 建筑线索：踢脚线 + 天花灯带（透视消失线 = 室内空间感的骨架）—— */}
+      {/* 左右踢脚线：墙脚微光勾边 */}
+      <mesh position={[-DOOR_OFFSET_X + 0.02, -CORRIDOR_HALF_HEIGHT + 0.07, centerZ]}>
+        <boxGeometry args={[0.03, 0.14, wallLen]} />
+        <meshStandardMaterial color="#1c1c2a" metalness={0.5} roughness={0.5} emissive="#8b7fb8" emissiveIntensity={0.12} />
+      </mesh>
+      <mesh position={[DOOR_OFFSET_X - 0.02, -CORRIDOR_HALF_HEIGHT + 0.07, centerZ]}>
+        <boxGeometry args={[0.03, 0.14, wallLen]} />
+        <meshStandardMaterial color="#1c1c2a" metalness={0.5} roughness={0.5} emissive="#8b7fb8" emissiveIntensity={0.12} />
+      </mesh>
+      {/* 天花中央灯带：贯穿走廊的细发光线（最强纵深透视线索，Bloom 出柔光） */}
+      <mesh position={[0, CORRIDOR_HALF_HEIGHT - 0.02, centerZ]}>
+        <boxGeometry args={[0.09, 0.02, wallLen]} />
+        <meshBasicMaterial color="#a99cd6" />
+      </mesh>
       {/* 尽头不再封口——走廊向未知敞开（靠远方微光 + 暗角自然隐没），留想象空间 */}
       {/* 尽头引导光源：远处微光 */}
       <pointLight
