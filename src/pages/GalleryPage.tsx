@@ -41,20 +41,22 @@ export default function GalleryPage() {
   const reduceMotion = usePrefersReducedMotion();
   // 聚焦的梦境（3D：点门先运镜聚焦看展签，再点/按钮才入画）
   const [focused, setFocused] = useState<Dream | null>(null);
+  // 入画中：相机向画面俯冲 + 页面淡出，随后跳转（内容即门——穿过画作进入梦境）
+  const [diving, setDiving] = useState(false);
 
   useEffect(() => {
     setView("gallery");
   }, [setView]);
 
-  // ESC 退出聚焦
+  // ESC 退出聚焦（入画途中不可中断）
   useEffect(() => {
-    if (!focused) return;
+    if (!focused || diving) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setFocused(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [focused]);
+  }, [focused, diving]);
 
   // 首次进入空画廊且已完成引导时，自动加载示例梦境（仅一次，用户清空后不再自动加载）
   useEffect(() => {
@@ -113,9 +115,20 @@ export default function GalleryPage() {
     setFocused(null);
     try { localStorage.setItem(STORAGE_KEY, m); } catch { /* ignore */ }
   };
-  const enterDream = (d: Dream) => { setSelectedDream(d.id); navigate(`/dream/${d.id}`); };
+  const gotoDream = (d: Dream) => { setSelectedDream(d.id); navigate(`/dream/${d.id}`); };
+  // 入画：3D 聚焦态下相机向画面俯冲 + 淡出遮罩，~0.82s 后真正跳转（reduce-motion 直接跳）
+  const enterDream = (d: Dream) => {
+    if (mode === "3d" && !reduceMotion && focused?.id === d.id) {
+      if (diving) return;
+      setDiving(true);
+      window.setTimeout(() => gotoDream(d), 820);
+      return;
+    }
+    gotoDream(d);
+  };
   // 3D：第一次点门 → 运镜聚焦看展签；再点同一扇门（或展签按钮）→ 入画。2.5D 卡片本身已含信息，直接进入。
   const handleSelect = (d: Dream) => {
+    if (diving) return;
     if (mode === "3d" && focused?.id !== d.id) {
       setFocused(d);
       return;
@@ -197,6 +210,10 @@ export default function GalleryPage() {
     const focusColor = focused
       ? (getEmotionByWord(focused.emotion.word)?.color ?? "#c9b8e8")
       : "#c9b8e8";
+    // 展签方位：偏心构图把画作让位到一侧，展签占对侧留白
+    // 左墙画（idx 偶数，side=-1）→ 画偏屏幕右 → 展签在左；右墙画反之
+    const focusIdx = focused ? recent.findIndex((d) => d.id === focused.id) : -1;
+    const focusSide = focusIdx >= 0 && focusIdx % 2 === 0 ? -1 : 1;
     return (
       <div className="relative bg-dreamgate-deep">
         <div className="fixed inset-0 z-0">
@@ -208,7 +225,8 @@ export default function GalleryPage() {
             reduceMotion={reduceMotion}
             onLowPerformance={() => triggerDegradation("desktop3D")}
             focusedId={focused?.id ?? null}
-            onMissClick={() => setFocused(null)}
+            diving={diving}
+            onMissClick={() => { if (!diving) setFocused(null); }}
           />
         </div>
         {!withShaderFog && <Fog className="pointer-events-none fixed inset-0 z-[1]" intensity={0.5} color={accentColor} />}
@@ -223,56 +241,79 @@ export default function GalleryPage() {
             </Caption>
           </div>
         )}
-        {/* 聚焦展签：博物馆说明牌 —— 情绪 · 日期 · 摘录 · 入画 */}
+        {/* 聚焦展签：编辑式侧栏（noomo 排版语言）——画作偏一侧，展签占对侧留白，
+            文字直接落在场景上（无卡片壳），左右交替 = 每次驻足都是一页新的画册排版 */}
         <AnimatePresence>
-          {focused && (
-            <motion.div
+          {focused && !diving && (
+            <motion.aside
               key={focused.id}
-              initial={{ opacity: 0, y: 36 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 24 }}
-              transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-              className="pointer-events-none fixed inset-x-0 bottom-7 z-20 flex justify-center px-5"
+              initial={{ opacity: 0, x: focusSide === -1 ? -30 : 30, y: "-50%" }}
+              animate={{ opacity: 1, x: 0, y: "-50%" }}
+              exit={{ opacity: 0, x: focusSide === -1 ? -18 : 18, y: "-50%" }}
+              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
+              className={`pointer-events-none fixed top-1/2 z-20 w-[21rem] max-w-[78vw] ${
+                focusSide === -1 ? "left-6 md:left-16" : "right-6 md:right-16"
+              }`}
             >
-              <div className="pointer-events-auto w-full max-w-xl rounded-[1.6rem] border border-white/10 bg-white/[0.03] p-1.5 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.8)]">
-                <div className="rounded-[calc(1.6rem-0.375rem)] bg-dreamgate-elevated/85 px-6 py-5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.07)] backdrop-blur-xl">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{ background: focusColor, boxShadow: `0 0 10px ${focusColor}` }}
-                      />
-                      <span className="font-mono text-xs" style={{ color: focusColor }}>
-                        {focused.emotion.word}
-                      </span>
-                      <Caption as="span" className="text-[11px]">
-                        {new Date(focused.createdAt).toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" })}
-                      </Caption>
-                    </div>
-                    <button
-                      type="button"
-                      aria-label="返回走廊"
-                      onClick={() => setFocused(null)}
-                      className="rounded-full p-1 text-dreamgate-text-muted transition-colors hover:text-dreamgate-text-primary"
-                    >
-                      <X size={15} />
-                    </button>
-                  </div>
-                  <p className="mt-3 line-clamp-2 font-body text-[15px] leading-relaxed text-dreamgate-text-primary">
-                    {focused.rawText}
-                  </p>
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <Button variant="ethereal" size="sm" onClick={() => enterDream(focused)}>
-                      入画 · 步入梦境
-                      <ArrowRight size={14} />
-                    </Button>
-                    <Caption as="span" className="hidden text-[10px] sm:inline">
-                      再次点击画作亦可入画 · ESC 返回
-                    </Caption>
-                  </div>
+              <div
+                className={`pointer-events-auto flex flex-col ${
+                  focusSide === -1 ? "items-start text-left" : "items-end text-right"
+                }`}
+              >
+                <Caption as="div" className="font-mono text-[10px] tracking-[0.42em]">
+                  N°{String(focusIdx + 1).padStart(2, "0")} ·{" "}
+                  {new Date(focused.createdAt).toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" })}
+                </Caption>
+                <div className={`mt-4 flex items-center gap-2.5 ${focusSide === 1 ? "flex-row-reverse" : ""}`}>
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: focusColor, boxShadow: `0 0 12px ${focusColor}` }}
+                  />
+                  <span className="font-mono text-xs tracking-[0.2em]" style={{ color: focusColor }}>
+                    {focused.emotion.word}
+                  </span>
                 </div>
+                <p
+                  className="mt-5 line-clamp-4 font-display text-[1.55rem] leading-snug text-dreamgate-text-primary md:text-[1.8rem]"
+                  style={{ textShadow: "0 2px 24px rgba(0,0,0,0.85)" }}
+                >
+                  {focused.rawText}
+                </p>
+                <div
+                  className="mt-6 h-px w-16"
+                  style={{ background: `linear-gradient(${focusSide === -1 ? "90deg" : "270deg"}, ${focusColor}88, transparent)` }}
+                />
+                <div className={`mt-7 flex items-center gap-4 ${focusSide === 1 ? "flex-row-reverse" : ""}`}>
+                  <Button variant="ethereal" size="sm" onClick={() => enterDream(focused)}>
+                    入画 · 步入梦境
+                    <ArrowRight size={14} />
+                  </Button>
+                  <button
+                    type="button"
+                    aria-label="返回走廊"
+                    onClick={() => setFocused(null)}
+                    className="rounded-full border border-white/10 p-1.5 text-dreamgate-text-muted transition-colors hover:text-dreamgate-text-primary"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <Caption as="div" className="mt-5 text-[10px]">
+                  再次点击画作亦可入画 · ESC 返回
+                </Caption>
               </div>
-            </motion.div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
+        {/* 入画淡出遮罩：相机俯冲的同时画面沉入黑暗——「穿过画布」的一瞬 */}
+        <AnimatePresence>
+          {diving && (
+            <motion.div
+              key="dive-fade"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.62, ease: "easeIn", delay: 0.18 }}
+              className="pointer-events-auto fixed inset-0 z-40 bg-dreamgate-deep"
+            />
           )}
         </AnimatePresence>
       </div>

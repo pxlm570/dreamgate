@@ -202,34 +202,45 @@ function CameraRig({
   length,
   reduceMotion,
   focusTarget,
+  diving = false,
 }: {
   scrollRef: RefObject<number>;
   length: number;
   reduceMotion: boolean;
   focusTarget: FocusTarget | null;
+  diving?: boolean;
 }) {
   const { camera } = useThree();
   const startZ = 4;
   const endZ = -length - 4;
+  // 聚焦偏心构图的 lookAt z 偏移（damp 过渡，入画俯冲时收回到正对画心）
+  const lookZOffRef = useRef(0.9);
   // 注：平滑一律用 damp（帧率无关的指数衰减）。固定系数 lerp 在帧率波动时
   // 平滑量逐帧不同（重场景帧率不稳），叠加 Lenis 自身平滑即产生肉眼可见的滚动抖动。
   useFrame((state, delta) => {
     const dt = Math.min(delta, 0.05); // 掐掉超长帧尖峰，防跳变
     if (focusTarget) {
-      // 聚焦：相机移到门前（距门约 2.7），正对门面，带极轻指针视差保留呼吸感
-      const camX = focusTarget.side * (DOOR_OFFSET_X - 2.7);
-      const px = reduceMotion ? 0 : state.pointer.x * 0.08;
-      const py = reduceMotion ? 0 : state.pointer.y * 0.06;
+      // 聚焦：偏心构图（noomo 编辑式排版）——lookAt 沿走廊方向偏移 0.9，
+      // 画作让位到画面一侧，另一侧留白给 DOM 展签（左墙画→画偏右/展签在左，右墙反之）。
+      // 入画（diving）：相机向画面俯冲 + lookAt 收回画心，配合页面淡出完成「穿越入画」。
+      const camX = focusTarget.side * (DOOR_OFFSET_X - (diving ? 1.05 : 2.7));
+      const lookZTarget = diving ? 0 : 0.9;
+      const px = reduceMotion || diving ? 0 : state.pointer.x * 0.08;
+      const py = reduceMotion || diving ? 0 : state.pointer.y * 0.06;
       if (reduceMotion) {
+        lookZOffRef.current = lookZTarget;
         camera.position.set(camX, 0.1, focusTarget.z);
       } else {
-        camera.position.x = THREE.MathUtils.damp(camera.position.x, camX + px, 4.5, dt);
-        camera.position.y = THREE.MathUtils.damp(camera.position.y, 0.1 + py, 4.5, dt);
-        camera.position.z = THREE.MathUtils.damp(camera.position.z, focusTarget.z, 4.5, dt);
+        const lam = diving ? 3.2 : 4.5;
+        lookZOffRef.current = THREE.MathUtils.damp(lookZOffRef.current, lookZTarget, lam, dt);
+        camera.position.x = THREE.MathUtils.damp(camera.position.x, camX + px, lam, dt);
+        camera.position.y = THREE.MathUtils.damp(camera.position.y, 0.1 + py, lam, dt);
+        camera.position.z = THREE.MathUtils.damp(camera.position.z, focusTarget.z, lam, dt);
       }
-      camera.lookAt(focusTarget.x, 0, focusTarget.z);
+      camera.lookAt(focusTarget.x, 0, focusTarget.z + lookZOffRef.current);
       return;
     }
+    lookZOffRef.current = 0.9; // 退出聚焦即复位，下次聚焦仍是偏心构图
     const p = Math.max(0, Math.min(1, scrollRef.current ?? 0));
     const targetZ = startZ + (endZ - startZ) * p;
     if (reduceMotion) {
@@ -288,6 +299,8 @@ export interface CorridorSceneProps {
   onLowPerformance?: () => void;
   /** 当前聚焦的梦境 id（聚焦模式：相机运镜到该门前，忽略滚动） */
   focusedId?: string | null;
+  /** 入画中：相机向聚焦画面俯冲（配合页面淡出过渡） */
+  diving?: boolean;
   /** 点击画布空白处（未命中任何门）——外部用于退出聚焦 */
   onMissClick?: () => void;
 }
@@ -300,6 +313,7 @@ export function CorridorScene({
   reduceMotion,
   onLowPerformance,
   focusedId,
+  diving = false,
   onMissClick,
 }: CorridorSceneProps) {
   // 最近 20 条，最新在前（走廊入口先看到最新梦境）
@@ -340,7 +354,7 @@ export function CorridorScene({
       <pointLight position={[0, 4, 2]} intensity={0.6} color={accentColor} distance={15} />
       <pointLight position={[0, -2, 4]} intensity={0.3} color="#c9b8e8" distance={10} />
       <CorridorWalls length={length} accentColor={accentColor} glowTex={glowTex} />
-      <CameraRig scrollRef={scrollRef} length={length} reduceMotion={reduceMotion} focusTarget={focusTarget} />
+      <CameraRig scrollRef={scrollRef} length={length} reduceMotion={reduceMotion} focusTarget={focusTarget} diving={diving} />
       {!reduceMotion && <CorridorDust length={length} color={accentColor} texture={glowTex} />}
       {!reduceMotion && <FpsSampler onLow={onLowPerformance} />}
       {recent.map((d, i) => {

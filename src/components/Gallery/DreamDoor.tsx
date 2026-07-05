@@ -178,25 +178,46 @@ export function DreamDoor({
     [title, dream.emotion.word, emotionColor],
   );
 
-  // hover / 聚焦 时门微微放大 + 辉光与标签透明度跟随（每帧 lerp 平滑过渡）
+  // 逐画注目节奏（kimi 式分幕感延伸进走廊）：
+  // 相机走近 → 该画获得 0~1「注目度」→ 射灯亮起/光池变亮/标签浮现；
+  // 远处的画自动暗下——任何时刻只有身边的画被「点亮」，走廊有了呼吸的节奏。
   const lit = hovered || highlight;
   const glowRef = useRef<THREE.Mesh>(null);
   const labelRef = useRef<THREE.Sprite>(null);
-  useFrame(() => {
+  const frameMatRef = useRef<THREE.MeshStandardMaterial>(null);
+  const poolMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const washMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  useFrame((state, delta) => {
     const g = groupRef.current;
     if (!g) return;
-    const target = lit ? 1.06 : 1;
-    g.scale.x = THREE.MathUtils.lerp(g.scale.x, target, 0.15);
-    g.scale.y = THREE.MathUtils.lerp(g.scale.y, target, 0.15);
-    // 外层辉光 mesh 的 opacity 跟随点亮状态
+    const dt = Math.min(delta, 0.05);
+    // 注目度：距离 2 以内满格，5.5 之外归零；hover/聚焦时恒为 1
+    const dz = Math.abs(state.camera.position.z - position[2]);
+    const near = THREE.MathUtils.clamp(1 - (dz - 2) / 3.5, 0, 1);
+    const attention = Math.max(near * 0.85, lit ? 1 : 0);
+
+    const target = 1 + attention * 0.02 + (lit ? 0.04 : 0);
+    g.scale.x = THREE.MathUtils.damp(g.scale.x, target, 8, dt);
+    g.scale.y = THREE.MathUtils.damp(g.scale.y, target, 8, dt);
     if (glowRef.current) {
       const mat = glowRef.current.material as THREE.MeshBasicMaterial;
-      const targetOpacity = lit ? 0.35 : 0.08;
-      mat.opacity = THREE.MathUtils.lerp(mat.opacity, targetOpacity, 0.12);
+      mat.opacity = THREE.MathUtils.damp(mat.opacity, 0.05 + attention * 0.3, 6, dt);
     }
     if (labelRef.current) {
       const mat = labelRef.current.material as THREE.SpriteMaterial;
-      mat.opacity = THREE.MathUtils.lerp(mat.opacity, lit ? 1 : 0.75, 0.12);
+      mat.opacity = THREE.MathUtils.damp(mat.opacity, 0.18 + attention * 0.82, 6, dt);
+    }
+    if (frameMatRef.current) {
+      frameMatRef.current.emissiveIntensity = THREE.MathUtils.damp(
+        frameMatRef.current.emissiveIntensity, 0.05 + attention * 0.5, 6, dt);
+    }
+    if (poolMatRef.current) {
+      poolMatRef.current.opacity = THREE.MathUtils.damp(
+        poolMatRef.current.opacity, 0.12 + attention * 0.55, 6, dt);
+    }
+    if (washMatRef.current) {
+      washMatRef.current.opacity = THREE.MathUtils.damp(
+        washMatRef.current.opacity, 0.04 + attention * 0.14, 6, dt);
     }
   });
 
@@ -220,11 +241,12 @@ export function DreamDoor({
       <mesh position={[0, 0, -0.08]}>
         <boxGeometry args={[DOOR_W + 0.5, DOOR_H + 0.5, 0.06]} />
         <meshStandardMaterial
+          ref={frameMatRef}
           color="#0b0b13"
           metalness={0.45}
           roughness={0.55}
           emissive={emotionColor}
-          emissiveIntensity={lit ? 0.28 : 0.06}
+          emissiveIntensity={0.06}
         />
       </mesh>
       {/* 卡纸（mat）：暖白内衬——画作被「装裱」而非悬浮 */}
@@ -243,10 +265,11 @@ export function DreamDoor({
         <mesh position={[0, 1.1, -0.1]} scale={[3.6, 4.4, 1]}>
           <planeGeometry args={[1, 1]} />
           <meshBasicMaterial
+            ref={washMatRef}
             map={glowTex}
             color="#efe8ff"
             transparent
-            opacity={lit ? 0.17 : 0.1}
+            opacity={0.06}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
@@ -308,10 +331,11 @@ export function DreamDoor({
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2.96, 1.0]} scale={[2.8, 1.8, 1]}>
           <planeGeometry args={[1, 1]} />
           <meshBasicMaterial
+            ref={poolMatRef}
             map={glowTex}
             color={emotionColor}
             transparent
-            opacity={lit ? 0.7 : 0.36}
+            opacity={0.18}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
