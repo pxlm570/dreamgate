@@ -128,8 +128,8 @@ export default function GatePage() {
           key="flash"
           className="pointer-events-none absolute inset-0 z-30"
           initial={{ opacity: 0 }}
-          animate={{ opacity: [0, 0.6, 0] }}
-          transition={{ duration: 0.7, times: [0, 0.3, 1] }}
+          animate={{ opacity: [0, 0.42, 0] }}
+          transition={{ duration: 0.55, times: [0, 0.3, 1] }}
           style={{
             background:
               "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.85), rgba(201,184,232,0.3) 60%, transparent 100%)",

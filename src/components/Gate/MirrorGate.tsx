@@ -41,23 +41,39 @@ function makeGlowTexture(): THREE.CanvasTexture {
  * 舞台感的关键：背景不是黑洞，而是有远方的「空」。
  */
 function makeBackdropTexture(): THREE.CanvasTexture {
-  const w = 256;
+  // 大平面上的线性渐变会读成「塑料布」——空气感要靠多层柔和色晕的不均匀性：
+  // 亮区有形状、有偏移、有冷暖对比，边缘沉入基调，重噪抖动杀色带
+  const w = 512;
   const h = 512;
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d")!;
-  const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, "#0c0b18");
-  g.addColorStop(0.5, "#171331");
-  g.addColorStop(0.72, "#251d45"); // 地平线：最亮的深紫
-  g.addColorStop(1, "#0e0c1d");
-  ctx.fillStyle = g;
+  ctx.fillStyle = "#0b0a16";
+  ctx.fillRect(0, 0, w, h);
+  const orb = (cx: number, cy: number, r: number, color: string, a: number) => {
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, color.replace("A)", `${a})`));
+    g.addColorStop(1, color.replace("A)", "0)"));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  };
+  ctx.globalCompositeOperation = "lighter";
+  orb(w * 0.5, h * 0.74, w * 0.5, "rgba(58,48,104,A)", 0.5); // 主光区：地平线上方暗紫
+  orb(w * 0.3, h * 0.6, w * 0.38, "rgba(84,66,140,A)", 0.2); // 左上偏亮紫
+  orb(w * 0.72, h * 0.66, w * 0.42, "rgba(58,84,120,A)", 0.15); // 右侧一点冷蓝平衡
+  orb(w * 0.5, h * 0.26, w * 0.55, "rgba(28,24,56,A)", 0.32); // 上空幽暗
+  ctx.globalCompositeOperation = "source-over";
+  // 四周暗角：平面边界沉入基调色，看不出「一块布」的边
+  const vig = ctx.createRadialGradient(w / 2, h * 0.62, h * 0.2, w / 2, h * 0.62, h * 0.72);
+  vig.addColorStop(0, "rgba(11,10,22,0)");
+  vig.addColorStop(1, "rgba(11,10,22,0.9)");
+  ctx.fillStyle = vig;
   ctx.fillRect(0, 0, w, h);
   const img = ctx.getImageData(0, 0, w, h);
   const px = img.data;
   for (let i = 0; i < px.length; i += 4) {
-    const n = (Math.random() - 0.5) * 8;
+    const n = (Math.random() - 0.5) * 13;
     px[i] += n;
     px[i + 1] += n;
     px[i + 2] += n;
@@ -471,36 +487,39 @@ function MirrorAndCamera({
     if (!triggering) return;
     const fog = scene.fog as THREE.FogExp2 | null;
     const tl = gsap.timeline();
+    // 时序三拍（拍与拍之间有先后，不再同时糊在一起）：
+    //   第1拍 0~0.45s  碎裂——镜面消失、碎片起飞、白闪
+    //   第2拍 0.45s~   显影——碎片让出中心后「画界」才浮现
+    //   第3拍 0.35s~   坠入——相机 power2.in 加速冲向画面（越来越快=坠落感）
     if (mirrorRef.current) {
       tl.to(
         mirrorRef.current.scale,
-        { x: 0, y: 0, duration: 0.3, ease: "power3.in" },
+        { x: 0, y: 0, duration: 0.25, ease: "power3.in" },
         0,
       );
     }
-    // 飞入画中：碎镜的同时，镜后「画界」显影——同一幅梦境图放大成整个视野，
-    // 相机推进到它跟前时画面被图完全充满 = 坠入图中（内容即是转场本身）
     if (portalRef.current) {
       const pm = portalRef.current.material as THREE.MeshBasicMaterial;
       portalRef.current.visible = true;
       pm.opacity = 0;
-      tl.to(pm, { opacity: 1, duration: 1.05, ease: "power2.out" }, 0.22);
+      tl.to(pm, { opacity: 1, duration: 0.9, ease: "power2.out" }, 0.45);
       tl.to(
         portalRef.current.scale,
-        { x: 1.22, y: 1.22, duration: 1.9, ease: "power1.inOut" },
-        0.1,
+        { x: 1.22, y: 1.22, duration: 1.6, ease: "power1.in" },
+        0.45,
       );
     }
     if (fog) {
-      tl.to(fog, { density: 0.34, duration: 1.8, ease: "power2.in" }, 0);
+      // 雾只轻微加浓：0.34 会把碎片和门框灰化成一锅粥（画界 fog=false 不受影响）
+      tl.to(fog, { density: 0.2, duration: 1.6, ease: "power2.in" }, 0.25);
     }
     tl.to(
       camera.position,
       {
         z: -3.2,
-        duration: 1.85,
-        ease: "power2.inOut",
-        delay: 0.15,
+        duration: 1.7,
+        ease: "power2.in",
+        delay: 0.35,
         onComplete,
       },
       0,
@@ -553,13 +572,13 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
         <planeGeometry args={[64, 32]} />
         <meshBasicMaterial map={backdrop} fog={false} />
       </mesh>
-      {/* 地平线微光：镜后远方的一线晨昏（拉开纵深，背景不再是黑洞） */}
+      {/* 地平线微光：镜后远方的一线晨昏（压低压小——过亮的大光带=平板塑料感） */}
       <GlowPlane
         texture={glow}
-        position={[0, -0.7, -13.5]}
-        scale={[30, 8]}
+        position={[0, -1.1, -13.5]}
+        scale={[24, 6]}
         color={ACCENT_3}
-        opacity={0.2}
+        opacity={0.11}
       />
       <pointLight position={[3, 4, 5]} intensity={1.2} color={ACCENT} distance={20} />
       <pointLight position={[-4, -2, 3]} intensity={0.7} color={ACCENT_2} distance={15} />

@@ -161,7 +161,7 @@ function CorridorWalls({ length, accentColor, glowTex }: { length: number; accen
         <boxGeometry args={[0.09, 0.02, wallLen]} />
         <meshBasicMaterial color="#a99cd6" />
       </mesh>
-      {/* 尽头不再封口——走廊向未知敞开（靠远方微光 + 暗角自然隐没），留想象空间 */}
+      {/* 尽头不再封口——走廊向未知敞开，想象感来自「纵深」而非一块亮斑 */}
       {/* 尽头引导光源：远处微光 */}
       <pointLight
         position={[0, 0, -length - 5]}
@@ -170,21 +170,50 @@ function CorridorWalls({ length, accentColor, glowTex }: { length: number; accen
         distance={16}
         decay={2}
       />
-      {/* 尽头柔光晕：更大更柔的远方微明，像走廊尽头未知处的微光 */}
-      <mesh position={[0, 0, -length - 7.5]} scale={[8, 8, 1]}>
-        <planeGeometry args={[1, 1]} />
-        <meshBasicMaterial
-          map={glowTex}
-          color={accentColor}
-          transparent
-          opacity={0.5}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-      {/* 尽头文案：canvas sprite（一次绘制零每帧成本），飘在柔光深处 */}
-      <sprite position={[0, 0.15, -length - 6.5]} scale={[5.6, 5.6 / endText.aspect, 1]}>
-        <spriteMaterial map={endText.tex} transparent opacity={0.9} depthWrite={false} />
+      {/* 光之隧道：柔光在不同深度递减层叠——单块大光晕会读成「一面发光的墙」，
+          多层递减才是「光通向更远处」 */}
+      {[
+        { z: -length - 6, s: 4.5, o: 0.38 },
+        { z: -length - 11, s: 8, o: 0.24 },
+        { z: -length - 18, s: 13, o: 0.14 },
+        { z: -length - 27, s: 20, o: 0.08 },
+      ].map((g, i) => (
+        <mesh key={i} position={[0, 0, g.z]} scale={[g.s, g.s, 1]}>
+          <planeGeometry args={[1, 1]} />
+          <meshBasicMaterial
+            map={glowTex}
+            color={accentColor}
+            transparent
+            opacity={g.o}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </mesh>
+      ))}
+      {/* 幽灵门：尽头之外墙上若隐若现的空门框——尚未成形的梦境，越远越淡 */}
+      {[0, 1, 2, 3].map((i) => {
+        const side = i % 2 === 0 ? -1 : 1;
+        const z = -length - 4 - i * 3.4;
+        return (
+          <mesh
+            key={`ghost-${i}`}
+            position={[side * (DOOR_OFFSET_X - 0.04), 0, z]}
+            rotation={[0, side === -1 ? Math.PI / 2 : -Math.PI / 2, 0]}
+          >
+            <planeGeometry args={[2.1, 3.1]} />
+            <meshBasicMaterial
+              color={accentColor}
+              transparent
+              opacity={0.11 - i * 0.022}
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+            />
+          </mesh>
+        );
+      })}
+      {/* 尽头文案：canvas sprite（一次绘制零每帧成本），飘在光的深处 */}
+      <sprite position={[0, 0.15, -length - 7.5]} scale={[5.6, 5.6 / endText.aspect, 1]}>
+        <spriteMaterial map={endText.tex} transparent opacity={0.85} depthWrite={false} />
       </sprite>
     </group>
   );
