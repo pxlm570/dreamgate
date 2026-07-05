@@ -5,7 +5,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Image as ImageIcon, Sparkles, CloudOff } from "lucide-react";
+import { Check, Image as ImageIcon, Sparkles, CloudOff } from "lucide-react";
 import { Caption, Mono } from "@/components/ui";
 import { presetToKey } from "@/components/Atmosphere";
 import { cn } from "@/lib/utils";
@@ -34,6 +34,21 @@ const PHASE_COPY: Record<string, { main: string; sub: string }> = {
   done: { main: "藏品落款完成", sub: "这场梦已被永久收藏" },
 };
 
+// 等待越久文案越体贴（gpt-image 单张可达 40s）：让用户确信一切都在正常推进
+const WAIT_LINES = [
+  "影像自模糊深处缓缓浮现，请稍候",
+  "颜料仍在沉淀——梦不肯轻易显形",
+  "这场梦比较深，显影需要多一点时间",
+  "快了，轮廓已经开始聚拢",
+  "最后的细节正在落定，值得这份等待",
+];
+
+/** 秒数 → mm:ss */
+function fmtElapsed(s: number): string {
+  const m = Math.floor(s / 60);
+  return `${String(m).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
 const BADGE_CLS: Record<string, string> = {
   amber: "border-amber-400/30 bg-amber-400/10 text-amber-200/80",
   sky: "border-sky-400/30 bg-sky-400/10 text-sky-200/80",
@@ -58,7 +73,19 @@ export function GenerationProgress({
   useEffect(() => {
     setDeveloped(false);
   }, [previewUrl]);
+  // 已用时：秒级心跳——最直接的「系统还活着」确认
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (phase === "done") return;
+    const t = window.setInterval(() => setElapsed((e) => e + 1), 1000);
+    return () => window.clearInterval(t);
+  }, [phase]);
   const copy = PHASE_COPY[phase] ?? PHASE_COPY.idle;
+  // 显影阶段的副文案随等待时长递进（每 9s 换一句，不循环）
+  const subText =
+    phase === "image" || (phase === "analysis" && !developed)
+      ? WAIT_LINES[Math.min(Math.floor(elapsed / 9), WAIT_LINES.length - 1)]
+      : copy.sub;
 
   return (
     <div className="flex flex-col items-center gap-7 py-6">
@@ -104,6 +131,18 @@ export function GenerationProgress({
             transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut", repeatDelay: 1.1 }}
           />
         )}
+        {/* 显影完成的确认瞬间：一次柔光闪过（只在 onLoad 时触发一次） */}
+        {developed && (
+          <motion.div
+            key={`flash-${previewUrl}`}
+            aria-hidden
+            initial={{ opacity: 0.7 }}
+            animate={{ opacity: 0 }}
+            transition={{ duration: 1.2, ease: "easeOut" }}
+            className="pointer-events-none absolute inset-0"
+            style={{ background: "radial-gradient(circle, rgba(255,255,255,0.55), rgba(201,184,232,0.18) 55%, transparent 75%)" }}
+          />
+        )}
         {/* 边缘暗角：相纸四周沉入暗房 */}
         <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_70px_rgba(0,0,0,0.55)]" />
       </div>
@@ -116,19 +155,23 @@ export function GenerationProgress({
           return (
             <div key={s.key} className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <motion.span
-                  className="h-1.5 w-1.5 rounded-full"
-                  animate={
-                    isActive
-                      ? { opacity: [0.5, 1, 0.5], scale: [1, 1.35, 1] }
-                      : { opacity: isDone ? 1 : 0.25, scale: 1 }
-                  }
-                  transition={isActive ? { duration: 1.6, repeat: Infinity, ease: "easeInOut" } : { duration: 0.4 }}
-                  style={{
-                    background: isActive || isDone ? "#c9b8e8" : "rgba(255,255,255,0.35)",
-                    boxShadow: isActive || isDone ? "0 0 8px rgba(201,184,232,0.9)" : "none",
-                  }}
-                />
+                {isDone ? (
+                  <Check size={11} className="text-dreamgate-ethereal" strokeWidth={2.5} />
+                ) : (
+                  <motion.span
+                    className="h-1.5 w-1.5 rounded-full"
+                    animate={
+                      isActive
+                        ? { opacity: [0.5, 1, 0.5], scale: [1, 1.35, 1] }
+                        : { opacity: 0.25, scale: 1 }
+                    }
+                    transition={isActive ? { duration: 1.6, repeat: Infinity, ease: "easeInOut" } : { duration: 0.4 }}
+                    style={{
+                      background: isActive ? "#c9b8e8" : "rgba(255,255,255,0.35)",
+                      boxShadow: isActive ? "0 0 8px rgba(201,184,232,0.9)" : "none",
+                    }}
+                  />
+                )}
                 <Mono
                   className={cn(
                     "text-[11px] tracking-[0.3em] transition-colors duration-500",
@@ -144,11 +187,33 @@ export function GenerationProgress({
         })}
       </div>
 
+      {/* 心跳行：已用时 + 显影完成确认（用户任何时刻都能确认「它在动」） */}
+      <div className="-mt-3 flex items-center gap-3">
+        {phase !== "done" && (
+          <Mono className="text-[10px] tracking-[0.2em] text-dreamgate-text-muted">
+            已等待 {fmtElapsed(elapsed)}
+          </Mono>
+        )}
+        <AnimatePresence>
+          {developed && phase !== "done" && (
+            <motion.span
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.5 }}
+              className="inline-flex items-center gap-1 font-mono text-[10px] text-emerald-200/85"
+            >
+              <Check size={10} strokeWidth={2.5} /> 影像已显影 · 正在落款
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </div>
+
       {/* ===== 诗性阶段文案 + fallback 徽章 ===== */}
       <div className="flex flex-col items-center gap-3">
         <AnimatePresence mode="wait">
           <motion.div
-            key={phase}
+            key={`${phase}-${subText}`}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
@@ -158,7 +223,7 @@ export function GenerationProgress({
             <span className="font-display text-lg tracking-wide text-dreamgate-text-primary">
               {copy.main}
             </span>
-            <Caption as="span" className="text-[11px]">{copy.sub}</Caption>
+            <Caption as="span" className="text-[11px]">{subText}</Caption>
           </motion.div>
         </AnimatePresence>
 

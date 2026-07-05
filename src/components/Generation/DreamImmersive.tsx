@@ -3,7 +3,7 @@
 // 滚动逐幕揭示；滚动越深图像越缓慢推近、暗场越沉——像在画的内部越走越深。
 // （gpt-image 从画框里解放出来：页面不是「展示图片的页面」，页面就是这幅画的内部）
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ChevronDown, Sparkles, Image as ImageIcon, AlertCircle } from "lucide-react";
 import { Caption, Mono, Body } from "@/components/ui";
@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import type { Dream } from "@/lib/types";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
+/** 幕2 原文超过此字数则收进可展开引文（保住大字排版的呼吸感） */
+const LONG_TEXT_LIMIT = 120;
 
 /** 滚动揭示：进入视口时上浮显现（once，画册翻页感） */
 function Reveal({ children, className }: { children: ReactNode; className?: string }) {
@@ -53,6 +55,8 @@ export function DreamImmersive({ dream, onImageError }: DreamImmersiveProps) {
   const emotionColor = getEmotionByWord(emotion.word)?.color ?? "#c9b8e8";
   const intensityPct = Math.round(emotion.intensity * 100);
   const dateStr = new Date(createdAt).toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" });
+  const isLongText = rawText.length > LONG_TEXT_LIMIT;
+  const [textExpanded, setTextExpanded] = useState(false);
 
   // 滚动进度：驱动背景图缓慢推近 + 暗场加深（越读越沉入画中）
   const { scrollYProgress } = useScroll();
@@ -132,16 +136,31 @@ export function DreamImmersive({ dream, onImageError }: DreamImmersiveProps) {
         </motion.div>
       </section>
 
-      {/* ===== 幕2 · 梦境原文：大字宋体独占一幕（文字即画面） ===== */}
+      {/* ===== 幕2 · 梦境原文：大字宋体独占一幕（文字即画面）
+              长梦收进可展开引文：先给克制的节选保住排版，一键展开读全文 ===== */}
       <section className="relative z-10 flex min-h-[92vh] items-center px-6 sm:px-12 md:px-20">
         <Reveal className="max-w-3xl">
           <SectionMark no="01" title="梦境原文" color={emotionColor} />
           <p
-            className="mt-8 font-display text-[1.7rem] leading-[1.6] text-dreamgate-text-primary md:text-[2.4rem]"
+            className={cn(
+              "mt-8 font-display leading-[1.65] text-dreamgate-text-primary",
+              isLongText ? "text-[1.35rem] md:text-[1.8rem]" : "text-[1.7rem] md:text-[2.4rem]",
+            )}
             style={{ textShadow: "0 2px 30px rgba(0,0,0,0.9)" }}
           >
-            {rawText}
+            {isLongText && !textExpanded ? rawText.slice(0, LONG_TEXT_LIMIT) + "……" : rawText}
           </p>
+          {isLongText && (
+            <button
+              type="button"
+              onClick={() => setTextExpanded((v) => !v)}
+              className="mt-7 inline-flex items-center gap-2 font-mono text-[11px] tracking-[0.32em] transition-opacity hover:opacity-75"
+              style={{ color: emotionColor }}
+            >
+              {textExpanded ? "收起引文" : "展开全文"}
+              <ChevronDown size={12} className={cn("transition-transform duration-300", textExpanded && "rotate-180")} />
+            </button>
+          )}
         </Reveal>
       </section>
 

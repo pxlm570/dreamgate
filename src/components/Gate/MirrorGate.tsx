@@ -11,7 +11,8 @@ import * as THREE from "three";
 import gsap from "gsap";
 import { useOptionalTexture } from "@/hooks/useOptionalTexture";
 
-const FOG_COLOR = "#0a0a14";
+// 基调从近黑提到深紫灰：留白要有层次的「空」，不是漆黑（noomo 的暗都是有色温的）
+const FOG_COLOR = "#0d0c19";
 const ACCENT = "#c9b8e8";
 const ACCENT_2 = "#4ec9b0";
 const ACCENT_3 = "#8b5cf6"; // 紫罗兰辉光辅色
@@ -30,6 +31,40 @@ function makeGlowTexture(): THREE.CanvasTexture {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, size, size);
   const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/**
+ * 天幕贴图：竖向渐变的无限影棚背景（cyclorama）——
+ * 地平线附近微亮的深紫，向上向下沉入基调色，加细噪抖动杀色带。
+ * 舞台感的关键：背景不是黑洞，而是有远方的「空」。
+ */
+function makeBackdropTexture(): THREE.CanvasTexture {
+  const w = 256;
+  const h = 512;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, "#0c0b18");
+  g.addColorStop(0.5, "#171331");
+  g.addColorStop(0.72, "#251d45"); // 地平线：最亮的深紫
+  g.addColorStop(1, "#0e0c1d");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  const img = ctx.getImageData(0, 0, w, h);
+  const px = img.data;
+  for (let i = 0; i < px.length; i += 4) {
+    const n = (Math.random() - 0.5) * 8;
+    px[i] += n;
+    px[i + 1] += n;
+    px[i + 2] += n;
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
   tex.needsUpdate = true;
   return tex;
 }
@@ -496,6 +531,7 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
   const glow = useMemo(makeGlowTexture, []);
   const shaft = useMemo(makeShaftTexture, []);
   const nebula = useMemo(makeNebulaTexture, []);
+  const backdrop = useMemo(makeBackdropTexture, []);
   // 镜中真画：gpt-image 生成的「门中梦境世界」（有作者的内容才是视觉主角）；
   // 未加载/缺图时回退程序星云，碎镜与镜面同源（碎的就是这幅画）
   const dreamTex = useOptionalTexture("/textures/mirror-dream.png");
@@ -510,8 +546,21 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
       <color attach="background" args={[FOG_COLOR]} />
       <fogExp2 attach="fog" args={[FOG_COLOR, 0.055]} />
       {/* 光源：环境光 + 半球光 + 顶光（紫白）+ 侧光（青绿）+ 辅光（紫罗兰） */}
-      <ambientLight intensity={0.4} />
-      <hemisphereLight color={ACCENT} groundColor={FOG_COLOR} intensity={0.3} />
+      <ambientLight intensity={0.5} />
+      <hemisphereLight color={ACCENT} groundColor={FOG_COLOR} intensity={0.38} />
+      {/* 天幕：无限影棚渐变背景（fog=false 保渐变纯净，否则远距被雾灰化） */}
+      <mesh position={[0, 2, -17]}>
+        <planeGeometry args={[64, 32]} />
+        <meshBasicMaterial map={backdrop} fog={false} />
+      </mesh>
+      {/* 地平线微光：镜后远方的一线晨昏（拉开纵深，背景不再是黑洞） */}
+      <GlowPlane
+        texture={glow}
+        position={[0, -0.7, -13.5]}
+        scale={[30, 8]}
+        color={ACCENT_3}
+        opacity={0.2}
+      />
       <pointLight position={[3, 4, 5]} intensity={1.2} color={ACCENT} distance={20} />
       <pointLight position={[-4, -2, 3]} intensity={0.7} color={ACCENT_2} distance={15} />
       <pointLight position={[0, 0, 3]} intensity={0.62} color={ACCENT_3} distance={11} />
@@ -569,7 +618,8 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
           mipmapBlur
           radius={0.72}
         />
-        <Vignette eskil={false} offset={0.15} darkness={0.88} />
+        {/* 暗角减弱：0.88 会把四周压成漆黑，吃掉留白层次 */}
+        <Vignette eskil={false} offset={0.12} darkness={0.7} />
       </EffectComposer>
     </Canvas>
   );

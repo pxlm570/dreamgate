@@ -11,7 +11,8 @@ import type { Dream } from "@/lib/types";
 import { getEmotionByWord } from "@/lib/emotions";
 import { DreamDoor } from "./DreamDoor";
 
-const FOG_BASE = "#07070d";
+// 基调从近黑提到深紫灰（有色温的暗才有留白感，漆黑只有虚无感）
+const FOG_BASE = "#0b0a15";
 const DOOR_SPACING = 4; // 每扇门 z 间距
 const DOOR_OFFSET_X = 3; // 门距走廊中轴 x 偏移
 const CORRIDOR_HALF_HEIGHT = 3;
@@ -125,7 +126,7 @@ function CorridorWalls({ length, accentColor, glowTex }: { length: number; accen
           depthScale={1}
           minDepthThreshold={0.4}
           maxDepthThreshold={1.2}
-          color="#080812"
+          color="#0c0b18"
           metalness={0.5}
           mirror={0.4}
         />
@@ -133,27 +134,27 @@ function CorridorWalls({ length, accentColor, glowTex }: { length: number; accen
       {/* 天花板：哑光深邃 */}
       <mesh position={[0, CORRIDOR_HALF_HEIGHT, centerZ]} rotation={[Math.PI / 2, 0, 0]}>
         <planeGeometry args={[6, wallLen]} />
-        <meshStandardMaterial color="#06060c" metalness={0.05} roughness={0.95} />
+        <meshStandardMaterial color="#0a0913" metalness={0.05} roughness={0.95} />
       </mesh>
       {/* 左墙：哑光深邃 */}
       <mesh position={[-DOOR_OFFSET_X, 0, centerZ]} rotation={[0, Math.PI / 2, 0]}>
         <planeGeometry args={[wallLen, 6]} />
-        <meshStandardMaterial color="#07070e" metalness={0.06} roughness={0.9} />
+        <meshStandardMaterial color="#0c0b17" metalness={0.06} roughness={0.9} />
       </mesh>
       {/* 右墙 */}
       <mesh position={[DOOR_OFFSET_X, 0, centerZ]} rotation={[0, -Math.PI / 2, 0]}>
         <planeGeometry args={[wallLen, 6]} />
-        <meshStandardMaterial color="#07070e" metalness={0.06} roughness={0.9} />
+        <meshStandardMaterial color="#0c0b17" metalness={0.06} roughness={0.9} />
       </mesh>
       {/* —— 建筑线索：踢脚线 + 天花灯带（透视消失线 = 室内空间感的骨架）—— */}
       {/* 左右踢脚线：墙脚微光勾边 */}
       <mesh position={[-DOOR_OFFSET_X + 0.02, -CORRIDOR_HALF_HEIGHT + 0.07, centerZ]}>
         <boxGeometry args={[0.03, 0.14, wallLen]} />
-        <meshStandardMaterial color="#1c1c2a" metalness={0.5} roughness={0.5} emissive="#8b7fb8" emissiveIntensity={0.12} />
+        <meshStandardMaterial color="#232236" metalness={0.5} roughness={0.5} emissive="#8b7fb8" emissiveIntensity={0.2} />
       </mesh>
       <mesh position={[DOOR_OFFSET_X - 0.02, -CORRIDOR_HALF_HEIGHT + 0.07, centerZ]}>
         <boxGeometry args={[0.03, 0.14, wallLen]} />
-        <meshStandardMaterial color="#1c1c2a" metalness={0.5} roughness={0.5} emissive="#8b7fb8" emissiveIntensity={0.12} />
+        <meshStandardMaterial color="#232236" metalness={0.5} roughness={0.5} emissive="#8b7fb8" emissiveIntensity={0.2} />
       </mesh>
       {/* 天花中央灯带：贯穿走廊的细发光线（最强纵深透视线索，Bloom 出柔光） */}
       <mesh position={[0, CORRIDOR_HALF_HEIGHT - 0.02, centerZ]}>
@@ -331,7 +332,7 @@ export function CorridorScene({
       : null;
   const accentColor =
     getEmotionByWord(recent[0]?.emotion.word ?? "")?.color ?? "#c9b8e8";
-  const fogColor = mixColor(FOG_BASE, accentColor, 0.1);
+  const fogColor = mixColor(FOG_BASE, accentColor, 0.16);
   const fogHex = `#${fogColor.getHexString()}`;
   // dpr 移动端降低，桌面端封顶 1.5
   const dpr: [number, number] =
@@ -349,8 +350,8 @@ export function CorridorScene({
       <color attach="background" args={[fogHex]} />
       {withShaderFog && <fogExp2 attach="fog" args={[fogHex, 0.05]} />}
       {/* 多层光源：环境 + 半球 + 顶光（情绪色）+ 辅光 */}
-      <ambientLight intensity={0.32} />
-      <hemisphereLight color={accentColor} groundColor={FOG_BASE} intensity={0.25} />
+      <ambientLight intensity={0.42} />
+      <hemisphereLight color={accentColor} groundColor={FOG_BASE} intensity={0.34} />
       <pointLight position={[0, 4, 2]} intensity={0.6} color={accentColor} distance={15} />
       <pointLight position={[0, -2, 4]} intensity={0.3} color="#c9b8e8" distance={10} />
       <CorridorWalls length={length} accentColor={accentColor} glowTex={glowTex} />
@@ -384,7 +385,8 @@ export function CorridorScene({
           mipmapBlur
           radius={0.65}
         />
-        <Vignette eskil={false} offset={0.2} darkness={0.8} />
+        {/* 暗角减弱：过重的暗角把走廊四周压成漆黑，吃掉建筑线条的留白层次 */}
+        <Vignette eskil={false} offset={0.16} darkness={0.62} />
       </EffectComposer>
     </Canvas>
   );
