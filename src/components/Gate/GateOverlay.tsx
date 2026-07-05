@@ -9,17 +9,19 @@
 // 不影响可见性，安全）。
 
 import { useEffect } from "react";
-import { motion, useMotionValue, useSpring } from "framer-motion";
+import { AnimatePresence, motion, useMotionValue, useSpring } from "framer-motion";
 import { Display, Caption } from "@/components/ui";
 
 export interface GateOverlayProps {
   /** 是否显示（idle 阶段显示，触发后淡出） */
   visible: boolean;
+  /** 分幕（kimi 式舞台）：0=远景幕（只有标题+靠近提示），1=近景幕（副文案+踏入提示） */
+  act?: 0 | 1;
 }
 
 const TITLE_CHARS = ["踏", "入", "梦", "境"];
 
-export function GateOverlay({ visible }: GateOverlayProps) {
+export function GateOverlay({ visible, act = 1 }: GateOverlayProps) {
   // 鼠标视差：文字层随鼠标轻微偏移
   const mx = useMotionValue(0);
   const my = useMotionValue(0);
@@ -71,43 +73,53 @@ export function GateOverlay({ visible }: GateOverlayProps) {
           ))}
         </Display>
 
-        {/* 分隔线：从中心展开 */}
-        <div
-          className="animate-gate-divider mt-8 h-px w-32 origin-center bg-gradient-to-r from-transparent via-dreamgate-ethereal/70 to-transparent"
-          style={{ animationDelay: "1.4s" }}
-        />
-
-        {/* 副标题：诗意一句话 */}
-        <p
-          className="animate-gate-up mt-7 max-w-md text-center font-body text-sm italic tracking-wide text-dreamgate-text-secondary md:text-base"
-          style={{ animationDelay: "1.8s" }}
-        >
-          在镜面之后，藏着你尚未读懂的自己
-        </p>
-
-        {/* 底部提示：呼吸入场 + 向下箭头微动 */}
-        <div
-          className="animate-gate-up mt-12 flex flex-col items-center gap-3"
-          style={{ animationDelay: "2.4s" }}
-        >
-          <Caption className="block text-xs uppercase tracking-[0.5em] text-dreamgate-text-secondary md:text-sm">
-            点击 · 或滚动 · 进入
-          </Caption>
-          <svg
-            width="14"
-            height="22"
-            viewBox="0 0 14 22"
-            fill="none"
-            className="animate-gate-arrow text-dreamgate-ethereal"
-          >
-            <path
-              d="M7 2 V18 M2 13 L7 18 L12 13"
-              stroke="currentColor"
-              strokeWidth="1.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+        {/* 分幕文案区（固定高度避免布局跳动）：
+            幕0 = 靠近提示；幕1 = 分隔线 + 副文案 + 踏入提示。
+            幕间切换由 AnimatePresence 交叉淡入（状态切换触发，无首挂丢帧风险）。 */}
+        <div className="relative mt-8 flex h-44 w-full max-w-md flex-col items-center">
+          <AnimatePresence mode="wait">
+            {act === 0 ? (
+              <motion.div
+                key="act0"
+                /* 首挂不用 framer 入场（3D 初始化抢主线程会丢帧卡在透明态——历史 bug 根因），
+                   入场交给 CSS 动画；framer 只管幕间退场 */
+                initial={false}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                className="animate-gate-up mt-10 flex flex-col items-center gap-3"
+                style={{ animationDelay: "2.1s" }}
+              >
+                <Caption className="block text-xs uppercase tracking-[0.5em] text-dreamgate-text-secondary md:text-sm">
+                  滚动 · 靠近梦境
+                </Caption>
+                <svg width="14" height="22" viewBox="0 0 14 22" fill="none" className="animate-gate-arrow text-dreamgate-ethereal">
+                  <path d="M7 2 V18 M2 13 L7 18 L12 13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="act1"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.5 }}
+                className="flex flex-col items-center"
+              >
+                <div className="h-px w-32 bg-gradient-to-r from-transparent via-dreamgate-ethereal/70 to-transparent" />
+                <p className="mt-7 max-w-md text-center font-body text-sm italic tracking-wide text-dreamgate-text-secondary md:text-base">
+                  在镜面之后，藏着你尚未读懂的自己
+                </p>
+                <div className="mt-10 flex flex-col items-center gap-3">
+                  <Caption className="block text-xs uppercase tracking-[0.5em] text-dreamgate-text-secondary md:text-sm">
+                    点击 · 或再滚动 · 踏入梦境
+                  </Caption>
+                  <svg width="14" height="22" viewBox="0 0 14 22" fill="none" className="animate-gate-arrow text-dreamgate-ethereal">
+                    <path d="M7 2 V18 M2 13 L7 18 L12 13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
     </div>

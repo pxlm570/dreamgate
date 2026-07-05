@@ -382,15 +382,17 @@ function Shards({ triggered, nebula }: { triggered: boolean; nebula: THREE.Textu
   );
 }
 
-/** 镜面 + 相机推进 + 雾气扩散（核心转场动画） */
+/** 镜面 + 相机推进 + 雾气扩散（核心转场动画）；act 驱动分幕运镜 */
 function MirrorAndCamera({
   triggering,
   onComplete,
   nebula,
+  act,
 }: {
   triggering: boolean;
   onComplete: () => void;
   nebula: THREE.Texture;
+  act: 0 | 1;
 }) {
   const mirrorRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
@@ -403,17 +405,25 @@ function MirrorAndCamera({
     const px = state.pointer.x;
     const py = state.pointer.y;
     if (!triggering) {
-      // 相机缓慢环绕漂移（李萨如轨迹）：持续的运动视差是最强的立体感线索
+      // 分幕运镜（kimi 式）：幕0 远景舞台全貌，幕1 推近镜面；
+      // 慢速 lerp 本身即 ~2s 的电影转场，叠加李萨如漂移保持画面恒动
       const t = state.clock.elapsedTime;
-      camera.position.z = 6 + Math.sin(t * 0.3) * 0.15;
+      const baseZ = act === 0 ? 8.8 : 5.2;
+      const ax = act === 0 ? 0.8 : 0.42;
+      const ay = act === 0 ? 0.32 : 0.18;
+      camera.position.z = THREE.MathUtils.lerp(
+        camera.position.z,
+        baseZ + Math.sin(t * 0.3) * 0.15,
+        0.035,
+      );
       camera.position.x = THREE.MathUtils.lerp(
         camera.position.x,
-        Math.sin(t * 0.11) * 0.55 + px * 0.35,
+        Math.sin(t * 0.11) * ax + px * 0.35,
         0.03,
       );
       camera.position.y = THREE.MathUtils.lerp(
         camera.position.y,
-        Math.cos(t * 0.09) * 0.22 + py * 0.18,
+        Math.cos(t * 0.09) * ay + py * 0.18,
         0.03,
       );
       camera.lookAt(0, 0, 0);
@@ -461,7 +471,7 @@ function MirrorAndCamera({
   );
 }
 
-export function MirrorGate({ triggering, onComplete }: MirrorGateProps) {
+export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps) {
   const glow = useMemo(makeGlowTexture, []);
   const shaft = useMemo(makeShaftTexture, []);
   const nebula = useMemo(makeNebulaTexture, []);
@@ -522,7 +532,7 @@ export function MirrorGate({ triggering, onComplete }: MirrorGateProps) {
         />
       </mesh>
       <MirrorFrame glow={glow} />
-      <MirrorAndCamera triggering={triggering} onComplete={onComplete} nebula={nebula} />
+      <MirrorAndCamera triggering={triggering} onComplete={onComplete} nebula={nebula} act={act} />
       <Shards triggered={triggering} nebula={nebula} />
       <DreamParticles texture={glow} />
       {/* 后处理：Bloom 辉光 + Vignette 暗角，电影感 */}
@@ -545,4 +555,6 @@ export interface MirrorGateProps {
   triggering: boolean;
   /** 转场完成回调 */
   onComplete: () => void;
+  /** 分幕（kimi 式舞台）：0=远景幕，1=近景幕；默认 1 保持旧行为 */
+  act?: 0 | 1;
 }

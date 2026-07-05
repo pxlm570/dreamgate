@@ -3,7 +3,7 @@
 // 检测 WebGL / 硬件并发，决定 3D 还是 CSS 降级
 // 点击 / 滚轮 / 触摸均可触发；完成后 setView('gallery') + navigate('/gallery')
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { useDreamStore } from "@/store/useDreamStore";
@@ -36,8 +36,20 @@ function shouldUseFallback(): boolean {
 export default function GatePage() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [mode, setMode] = useState<Mode>(null);
+  // kimi 式分幕：0=远景幕（门立于光瀑下）；1=近景幕（运镜推近镜面）；再进一步=碎镜穿越
+  const [act, setAct] = useState<0 | 1>(0);
+  const actRef = useRef<0 | 1>(0);
+  const phaseRef = useRef<Phase>("idle");
+  const lockRef = useRef(0); // 转场锁：一格滚轮=一次完整转场，转场期间忽略输入
   const navigate = useNavigate();
   const setView = useDreamStore((s) => s.setView);
+
+  useEffect(() => {
+    actRef.current = act;
+  }, [act]);
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
 
   // 同步 store 视图状态
   useEffect(() => {
@@ -53,6 +65,26 @@ export default function GatePage() {
     setPhase((p) => (p === "idle" ? "triggered" : p));
   }, []);
 
+  /** 分幕推进：dir=1 前进（幕0→幕1→碎镜），dir=-1 回退（幕1→幕0）。带 1.9s 转场锁。 */
+  const advance = useCallback(
+    (dir: 1 | -1) => {
+      if (phaseRef.current !== "idle") return;
+      const now = performance.now();
+      if (now - lockRef.current < 1900) return;
+      lockRef.current = now;
+      if (dir === -1) {
+        setAct((a) => (a === 1 ? 0 : a));
+        return;
+      }
+      if (actRef.current === 0) {
+        setAct(1);
+      } else {
+        trigger();
+      }
+    },
+    [trigger],
+  );
+
   const handleComplete = useCallback(() => {
     setPhase("done");
   }, []);
@@ -64,21 +96,25 @@ export default function GatePage() {
     navigate("/gallery");
   }, [phase, navigate, setView]);
 
-  // 全局滚轮 / 触摸触发（两种模式共用）
+  // 全局滚轮 / 触摸推进分幕（3D 模式）；降级模式保持一步直达
   useEffect(() => {
     if (mode === null) return;
-    const onWheel = () => trigger();
-    const onTouch = () => trigger();
-    window.addEventListener("wheel", onWheel, { once: true, passive: true });
-    window.addEventListener("touchstart", onTouch, {
-      once: true,
-      passive: true,
-    });
+    const isFallback = mode === "fallback";
+    const onWheel = (e: WheelEvent) => {
+      if (isFallback) return trigger();
+      advance(e.deltaY >= 0 ? 1 : -1);
+    };
+    const onTouch = () => {
+      if (isFallback) return trigger();
+      advance(1);
+    };
+    window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("touchstart", onTouch, { passive: true });
     return () => {
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("touchstart", onTouch);
     };
-  }, [mode, trigger]);
+  }, [mode, advance, trigger]);
 
   // 模式尚未判定时，渲染纯深色背景避免白闪
   if (mode === null) {
@@ -120,13 +156,14 @@ export default function GatePage() {
   return (
     <div
       className="relative h-[100dvh] w-screen cursor-pointer overflow-hidden bg-dreamgate-deep select-none"
-      onClick={trigger}
+      onClick={() => advance(1)}
     >
       <MirrorGate
         triggering={phase === "triggered"}
         onComplete={handleComplete}
+        act={act}
       />
-      <GateOverlay visible={phase === "idle"} />
+      <GateOverlay visible={phase === "idle"} act={act} />
       {flashOverlay}
     </div>
   );
