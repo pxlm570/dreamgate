@@ -50,6 +50,8 @@ export default {
         "gate-line": "gate-line 1.1s cubic-bezier(0.22,1,0.36,1) both",
         "gate-divider": "gate-divider 1.1s cubic-bezier(0.22,1,0.36,1) both",
         "gate-arrow": "gate-arrow 2.4s ease-in-out infinite",
+        // 页面入场揭幕：深色幕布淡出（纯 CSS + fill both，3D 初始化抢主线程也不丢帧）
+        "veil-out": "veil-out 1s ease-out 0.15s both",
       },
       keyframes: {
         float: {
@@ -67,6 +69,10 @@ export default {
         "fade-in": {
           from: { opacity: "0", transform: "translateY(8px)" },
           to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "veil-out": {
+          from: { opacity: "1" },
+          to: { opacity: "0" },
         },
         "gate-rise": {
           from: { opacity: "0", transform: "translateY(34px)", filter: "blur(10px)" },

@@ -142,7 +142,7 @@ export default function GatePage() {
           className="pointer-events-none absolute inset-0 z-30 bg-dreamgate-deep"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.55, ease: "easeIn", delay: 1.5 }}
+          transition={{ duration: 0.55, ease: "easeIn", delay: 1.75 }}
         />
       )}
     </AnimatePresence>

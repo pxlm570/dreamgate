@@ -109,6 +109,8 @@ export default function DreamRoomPage() {
   // 已生成：「画即世界」——图铺满全屏作舞台，操作栏浮在画上
   return (
     <div className="relative bg-dreamgate-deep">
+      {/* 入场揭幕：从画廊入画的淡出无缝接到这里的淡入 */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-50 animate-veil-out bg-dreamgate-deep" />
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}

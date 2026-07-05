@@ -419,13 +419,16 @@ function Shards({ triggered, nebula }: { triggered: boolean; nebula: THREE.Textu
 
   return (
     <group ref={groupRef}>
+      {/* 预热：opacity=0 而非 visible=false——15 份碎片纹理克隆若等到触发才首渲，
+          触发帧要一次性上传 15 张纹理 + 编译着色器，必然卡顿；常驻透明渲染零感知 */}
       {shardData.map((_, i) => (
-        <mesh key={i} visible={false}>
+        <mesh key={i}>
           <planeGeometry args={[SW, SH]} />
           <meshBasicMaterial
             map={shardTextures[i]}
             toneMapped={false}
             transparent
+            opacity={0}
             side={THREE.DoubleSide}
           />
         </mesh>
@@ -487,10 +490,11 @@ function MirrorAndCamera({
     if (!triggering) return;
     const fog = scene.fog as THREE.FogExp2 | null;
     const tl = gsap.timeline();
-    // 时序三拍（拍与拍之间有先后，不再同时糊在一起）：
-    //   第1拍 0~0.45s  碎裂——镜面消失、碎片起飞、白闪
-    //   第2拍 0.45s~   显影——碎片让出中心后「画界」才浮现
-    //   第3拍 0.35s~   坠入——相机 power2.in 加速冲向画面（越来越快=坠落感）
+    // 时序三拍（拍落完再起下一拍，节奏读得清）：
+    //   第1拍 0~0.55s   碎裂——镜面消失、碎片起飞、白闪
+    //   第2拍 0.6~1.5s  显影——碎片让出中心后「画界」浮现
+    //   第3拍 0.6~2.3s  坠入——相机 power2.in 从静止加速冲向画面（坠落感），
+    //                   前 0.6s 相机几乎不动，与碎裂拍错开
     if (mirrorRef.current) {
       tl.to(
         mirrorRef.current.scale,
@@ -500,18 +504,17 @@ function MirrorAndCamera({
     }
     if (portalRef.current) {
       const pm = portalRef.current.material as THREE.MeshBasicMaterial;
-      portalRef.current.visible = true;
       pm.opacity = 0;
-      tl.to(pm, { opacity: 1, duration: 0.9, ease: "power2.out" }, 0.45);
+      tl.to(pm, { opacity: 1, duration: 0.9, ease: "power2.out" }, 0.6);
       tl.to(
         portalRef.current.scale,
-        { x: 1.22, y: 1.22, duration: 1.6, ease: "power1.in" },
-        0.45,
+        { x: 1.22, y: 1.22, duration: 1.7, ease: "power1.in" },
+        0.6,
       );
     }
     if (fog) {
       // 雾只轻微加浓：0.34 会把碎片和门框灰化成一锅粥（画界 fog=false 不受影响）
-      tl.to(fog, { density: 0.2, duration: 1.6, ease: "power2.in" }, 0.25);
+      tl.to(fog, { density: 0.2, duration: 1.7, ease: "power2.in" }, 0.3);
     }
     tl.to(
       camera.position,
@@ -519,7 +522,7 @@ function MirrorAndCamera({
         z: -3.2,
         duration: 1.7,
         ease: "power2.in",
-        delay: 0.35,
+        delay: 0.6,
         onComplete,
       },
       0,
@@ -537,8 +540,10 @@ function MirrorAndCamera({
         <meshBasicMaterial map={nebula} />
       </mesh>
       {/* 「画界」：碎镜后在镜后显影的整幅梦境图（与镜面同源），相机坠入其中。
-          fog=false 保画面鲜活（穿雾时不被灰化）；平时隐藏零开销 */}
-      <mesh ref={portalRef} visible={false} position={[0, 0, -3.6]}>
+          fog=false 保画面鲜活（穿雾时不被灰化）。
+          注意：不用 visible=false 隐藏——opacity=0 保持渲染管线常驻，
+          纹理/着色器在挂载时就上传编译好；否则触发瞬间首次上传 GPU 必掉帧 */}
+      <mesh ref={portalRef} position={[0, 0, -3.6]}>
         <planeGeometry args={[7.2, 10.8]} />
         <meshBasicMaterial map={nebula} transparent opacity={0} fog={false} depthWrite={false} />
       </mesh>
@@ -550,7 +555,10 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
   const glow = useMemo(makeGlowTexture, []);
   const shaft = useMemo(makeShaftTexture, []);
   const nebula = useMemo(makeNebulaTexture, []);
-  const backdrop = useMemo(makeBackdropTexture, []);
+  const backdropCanvas = useMemo(makeBackdropTexture, []);
+  // 天幕真图：gpt-image matte painting（程序化色晕画不出空气感），缺图回退 canvas 版
+  const backdropImg = useOptionalTexture("/textures/gate-backdrop.png");
+  const backdrop = backdropImg ?? backdropCanvas;
   // 镜中真画：gpt-image 生成的「门中梦境世界」（有作者的内容才是视觉主角）；
   // 未加载/缺图时回退程序星云，碎镜与镜面同源（碎的就是这幅画）
   const dreamTex = useOptionalTexture("/textures/mirror-dream.png");

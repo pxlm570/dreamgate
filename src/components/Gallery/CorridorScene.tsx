@@ -9,6 +9,7 @@ import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import type { Dream } from "@/lib/types";
 import { getEmotionByWord } from "@/lib/emotions";
+import { useOptionalTexture } from "@/hooks/useOptionalTexture";
 import { DreamDoor } from "./DreamDoor";
 
 // 基调从近黑提到深紫灰（有色温的暗才有留白感，漆黑只有虚无感）
@@ -106,7 +107,7 @@ function CorridorDust({ length, color, texture }: { length: number; color: strin
 }
 
 /** 走廊墙壁：地板（MeshReflectorMaterial 反射）+ 天花板 + 左右墙 + 远端封口 + 尽头光源 */
-function CorridorWalls({ length, accentColor, glowTex }: { length: number; accentColor: string; glowTex: THREE.Texture }) {
+function CorridorWalls({ length, accentColor, glowTex, endMist }: { length: number; accentColor: string; glowTex: THREE.Texture; endMist: THREE.Texture | null }) {
   // 墙体向尽头方向大幅延长：让走廊管道在雾中隐没，而非露出方形开口
   // （之前 +16 会在尽头露出背景色的方形截面——「字的背景像塑料板」的元凶）
   const wallLen = length + 90;
@@ -172,17 +173,18 @@ function CorridorWalls({ length, accentColor, glowTex }: { length: number; accen
       />
       {/* 光之隧道：柔光在不同深度递减层叠——单块大光晕会读成「一面发光的墙」，
           多层递减才是「光通向更远处」 */}
+      {/* 远三层用 gpt-image 迷雾真图（有云絮形状的光才不像亮片），近一层保留情绪色柔光 */}
       {[
-        { z: -length - 6, s: 4.5, o: 0.38 },
-        { z: -length - 11, s: 8, o: 0.24 },
-        { z: -length - 18, s: 13, o: 0.14 },
-        { z: -length - 27, s: 20, o: 0.08 },
+        { z: -length - 6, s: 4.5, o: 0.38, mist: false },
+        { z: -length - 11, s: 8, o: 0.3, mist: true },
+        { z: -length - 18, s: 13, o: 0.2, mist: true },
+        { z: -length - 27, s: 20, o: 0.12, mist: true },
       ].map((g, i) => (
         <mesh key={i} position={[0, 0, g.z]} scale={[g.s, g.s, 1]}>
           <planeGeometry args={[1, 1]} />
           <meshBasicMaterial
-            map={glowTex}
-            color={accentColor}
+            map={g.mist && endMist ? endMist : glowTex}
+            color={g.mist && endMist ? "#ffffff" : accentColor}
             transparent
             opacity={g.o}
             blending={THREE.AdditiveBlending}
@@ -367,6 +369,8 @@ export function CorridorScene({
   const dpr: [number, number] =
     typeof window !== "undefined" && window.innerWidth < 768 ? [1, 1.2] : [1, 1.5];
   const glowTex = useMemo(makeGlowTexture, []);
+  // 尽头迷雾真图（gpt-image）：缺图回退程序化径向柔光
+  const endMist = useOptionalTexture("/textures/corridor-mist.png");
 
   return (
     <Canvas
@@ -383,7 +387,7 @@ export function CorridorScene({
       <hemisphereLight color={accentColor} groundColor={FOG_BASE} intensity={0.34} />
       <pointLight position={[0, 4, 2]} intensity={0.6} color={accentColor} distance={15} />
       <pointLight position={[0, -2, 4]} intensity={0.3} color="#c9b8e8" distance={10} />
-      <CorridorWalls length={length} accentColor={accentColor} glowTex={glowTex} />
+      <CorridorWalls length={length} accentColor={accentColor} glowTex={glowTex} endMist={endMist} />
       <CameraRig scrollRef={scrollRef} length={length} reduceMotion={reduceMotion} focusTarget={focusTarget} diving={diving} />
       {!reduceMotion && <CorridorDust length={length} color={accentColor} texture={glowTex} />}
       {!reduceMotion && <FpsSampler onLow={onLowPerformance} />}

@@ -216,6 +216,9 @@ export default function GalleryPage() {
     const focusSide = focusIdx >= 0 && focusIdx % 2 === 0 ? -1 : 1;
     return (
       <div className="relative bg-dreamgate-deep">
+        {/* 入场揭幕：深色幕布 1s 淡出，盖住 Canvas 初始化的生硬帧，
+            与镜之门末端暗场无缝衔接（纯 CSS + fill both，主线程拥塞也不丢帧） */}
+        <div aria-hidden className="pointer-events-none fixed inset-0 z-50 animate-veil-out bg-dreamgate-deep" />
         <div className="fixed inset-0 z-0">
           <CorridorScene
             dreams={dreams}
