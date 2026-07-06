@@ -10,6 +10,7 @@ import { useDreamStore } from "@/store/useDreamStore";
 import { MirrorGate } from "@/components/Gate/MirrorGate";
 import { GateOverlay } from "@/components/Gate/GateOverlay";
 import { CssMirrorFallback } from "@/components/Gate/CssMirrorFallback";
+import { CorridorScene } from "@/components/Gallery";
 
 type Phase = "idle" | "triggered" | "done";
 type Mode = "3d" | "fallback" | null;
@@ -77,6 +78,21 @@ export default function GatePage() {
   useEffect(() => {
     setMode(shouldUseFallback() ? "fallback" : "3d");
   }, []);
+
+  // 画廊预热（转场根治）：首屏稳定后隐形挂载走廊场景 4s——
+  // 着色器进驱动程序缓存、门图完成解码，随后卸载释放上下文；
+  // 之后画廊真正挂载时初始化耗时大幅缩短（卡顿的物理来源被提前消化）
+  const [warm, setWarm] = useState(false);
+  const warmScrollRef = useRef(0);
+  useEffect(() => {
+    if (mode !== "3d") return;
+    const t1 = window.setTimeout(() => setWarm(true), 1600);
+    const t2 = window.setTimeout(() => setWarm(false), 5800);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [mode]);
 
   const trigger = useCallback(() => {
     setPhase((p) => (p === "idle" ? "triggered" : p));
@@ -190,6 +206,23 @@ export default function GatePage() {
       />
       <GateOverlay visible={phase === "idle"} act={act} />
       {flashOverlay}
+      {/* 画廊预热：不可见、不可点，仅为编译/解码（4s 后自动卸载） */}
+      {warm && phase === "idle" && (
+        <div
+          aria-hidden
+          style={{ position: "fixed", inset: 0, opacity: 0, pointerEvents: "none", zIndex: -1 }}
+        >
+          <CorridorScene
+            dreams={dreams}
+            onDoorClick={() => {}}
+            scrollRef={warmScrollRef}
+            withShaderFog
+            reduceMotion={false}
+            focusedId={null}
+            onMissClick={() => {}}
+          />
+        </div>
+      )}
     </div>
   );
 }
