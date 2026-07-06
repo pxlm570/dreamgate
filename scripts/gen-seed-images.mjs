@@ -25,11 +25,18 @@ if (!KEY) {
 mkdirSync("public/seeds-gen", { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// 画风对标《光与影：33号远征队》(Clair Obscur: Expedition 33)：
+// 故事发生在「画中世界」，与本项目"画即世界"同构——Belle Époque 暗黑幻想油画质感
+const PAINT_STYLE =
+  "in the style of a Belle Époque dark-fantasy oil painting, painterly impasto brushstrokes, " +
+  "visible canvas texture, dramatic chiaroscuro lighting, romantic and melancholic, " +
+  "rich muted palette with luminous accents, fine art masterpiece";
+
 const STYLE = {
-  Ethereal: "ethereal dreamscape, soft lavender and pale-violet palette, luminous drifting mist, delicate, otherworldly, painterly",
-  "Dark Fantasy": "dark fantasy dreamscape, deep crimson and violet shadows, moody, cinematic, mysterious, painterly",
-  Mystical: "mystical dreamscape, deep purple and teal glow, arcane, ethereal fog, painterly",
-  Psychedelic: "psychedelic dreamscape, vivid flowing gradients, surreal, painterly",
+  Ethereal: "ethereal dreamscape, soft lavender and pale-violet palette, luminous drifting mist, delicate, otherworldly",
+  "Dark Fantasy": "dark fantasy dreamscape, deep crimson and violet shadows, moody, cinematic, mysterious",
+  Mystical: "mystical dreamscape, deep purple and teal glow, arcane, ethereal fog",
+  Psychedelic: "psychedelic dreamscape, vivid flowing gradients, surreal",
 };
 
 const DREAMS = [
@@ -41,7 +48,7 @@ const DREAMS = [
 ];
 
 async function tryGen(d) {
-  const prompt = `${d.scene}. ${STYLE[d.preset]}. surreal dream, atmospheric, no text, no words.`;
+  const prompt = `${d.scene}. ${STYLE[d.preset]}. ${PAINT_STYLE}. surreal dream, atmospheric, no text, no words.`;
   const res = await fetch(`${BASE}/v1/images/generations`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${KEY}` },

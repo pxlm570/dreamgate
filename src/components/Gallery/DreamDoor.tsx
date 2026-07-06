@@ -75,6 +75,37 @@ function makeLabelTexture(
   return { tex, aspect: w / h };
 }
 
+/**
+ * 画面内阴影贴图（模块级单例）：四边向内的柔和暗渐变。
+ * 叠在画作表面 = 画「嵌」在框里的进深感——直接贴图的"屏幕感"就来自缺这一层。
+ */
+let innerShadowTex: THREE.CanvasTexture | null = null;
+function getInnerShadowTexture(): THREE.CanvasTexture {
+  if (innerShadowTex) return innerShadowTex;
+  const w = 256;
+  const h = 384;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  const d = 30;
+  const edge = (x0: number, y0: number, x1: number, y1: number, rx: number, ry: number, rw: number, rh: number) => {
+    const g = ctx.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, "rgba(0,0,0,0.52)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(rx, ry, rw, rh);
+  };
+  edge(0, 0, 0, d, 0, 0, w, d); // 上
+  edge(0, h, 0, h - d, 0, h - d, w, d); // 下
+  edge(0, 0, d, 0, 0, 0, d, h); // 左
+  edge(w, 0, w - d, 0, w - d, 0, d, h); // 右
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  innerShadowTex = tex;
+  return tex;
+}
+
 /** 纯色 fallback 面板（imageUrl 为空或加载失败时） */
 function DoorPanelPlain({ color }: { color: string }) {
   return (
@@ -126,14 +157,14 @@ function DoorPanelTextured({
   return (
     <mesh>
       <planeGeometry args={[DOOR_W, DOOR_H]} />
-      {/* emissiveMap 让梦境图自发光，即使暗色种子图也能读出「发光藏品」质感 */}
+      {/* emissiveMap 让梦境图自发光；强度压低到「被射灯照亮的油画」而非背光屏幕 */}
       {/* 走 ACES 电影调色（toneMapped 默认 true）：高光柔和滚降，画作更「胶片」 */}
       <meshStandardMaterial
         map={texture}
         emissiveMap={texture}
         emissive="#ffffff"
-        emissiveIntensity={0.55}
-        roughness={0.55}
+        emissiveIntensity={0.45}
+        roughness={0.62}
       />
     </mesh>
   );
@@ -260,6 +291,18 @@ export function DreamDoor({
           emissiveIntensity={lit ? 0.14 : 0.07}
         />
       </mesh>
+      {/* 鎏金内衬（Belle Époque 装裱语言，对标《光与影 33》画框质感）：
+          卡纸与画之间一圈窄金边，金属高反射在射灯下出微光 */}
+      <mesh position={[0, 0, 0.0]}>
+        <planeGeometry args={[DOOR_W + 0.1, DOOR_H + 0.1]} />
+        <meshStandardMaterial
+          color="#96793f"
+          metalness={0.92}
+          roughness={0.32}
+          emissive="#5c4718"
+          emissiveIntensity={0.25}
+        />
+      </mesh>
       {/* 射灯洗墙光：从画上方倾泻在墙上的暖白光斑（美术馆 track light 打在墙面） */}
       {glowTex && (
         <mesh position={[0, 1.1, -0.1]} scale={[3.6, 4.4, 1]}>
@@ -267,7 +310,7 @@ export function DreamDoor({
           <meshBasicMaterial
             ref={washMatRef}
             map={glowTex}
-            color="#efe8ff"
+            color="#f3ead9"
             transparent
             opacity={0.06}
             blending={THREE.AdditiveBlending}
@@ -321,6 +364,16 @@ export function DreamDoor({
         ) : (
           <DoorPanelPlain color={emotionColor} />
         )}
+        {/* 画面内阴影：画嵌进框里的进深（去掉"图片直接贴上去"的屏幕感） */}
+        <mesh position={[0, 0, 0.004]}>
+          <planeGeometry args={[DOOR_W, DOOR_H]} />
+          <meshBasicMaterial
+            map={getInnerShadowTexture()}
+            transparent
+            opacity={0.85}
+            depthWrite={false}
+          />
+        </mesh>
       </group>
 
       {/* 注：不再每门挂 pointLight——20 扇门 = 20 个逐光源计费的光，是走廊卡顿主因。

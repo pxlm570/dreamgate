@@ -2,7 +2,7 @@
 // Canvas + fogExp2 + 走廊墙壁（地板/天花板/两侧）+ DreamDoor 两侧交替排列
 // 相机由外部 scrollRef（GSAP ScrollTrigger 写入）驱动，沿 Z 轴前进 + 指针视差
 
-import { useMemo, useRef, type RefObject } from "react";
+import { useEffect, useMemo, useRef, type RefObject } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { MeshReflectorMaterial } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
@@ -187,6 +187,23 @@ function CorridorWalls({ length, accentColor, glowTex, endMist }: { length: numb
         <planeGeometry args={[wallLen, 6]} />
         <meshStandardMaterial map={wallGrad} color="#ffffff" metalness={0.06} roughness={0.9} />
       </mesh>
+      {/* 壁柱：每两幅画之间一根竖向浅浮雕柱——长墙被切分出间律，
+          墙不再是无限延伸的平板（真实美术馆的展墙分隔语言） */}
+      {Array.from({ length: Math.max(Math.floor(length / 4) + 2, 2) }, (_, i) => {
+        const z = 2 - i * 4;
+        return (
+          <group key={`pil-${i}`}>
+            <mesh position={[-DOOR_OFFSET_X + 0.05, 0, z]}>
+              <boxGeometry args={[0.1, 6, 0.44]} />
+              <meshStandardMaterial color="#13111f" metalness={0.3} roughness={0.7} />
+            </mesh>
+            <mesh position={[DOOR_OFFSET_X - 0.05, 0, z]}>
+              <boxGeometry args={[0.1, 6, 0.44]} />
+              <meshStandardMaterial color="#13111f" metalness={0.3} roughness={0.7} />
+            </mesh>
+          </group>
+        );
+      })}
       {/* —— 建筑线索：踢脚线 + 天花灯带（透视消失线 = 室内空间感的骨架）—— */}
       {/* 左右踢脚线：墙脚微光勾边 */}
       <mesh position={[-DOOR_OFFSET_X + 0.02, -CORRIDOR_HALF_HEIGHT + 0.07, centerZ]}>
@@ -289,6 +306,14 @@ function CameraRig({
   const endZ = -length - 4;
   // 聚焦偏心构图的 lookAt z 偏移（damp 过渡，入画俯冲时收回到正对画心）
   const lookZOffRef = useRef(0.9);
+  // 入场推镜：挂载时相机从走廊门外(+6)向内滑入——延续碎镜俯冲的前进动量，
+  // 「像推开大门走进来」而非黑屏后原地出现
+  const introRef = useRef(reduceMotion ? 0 : 6);
+  useEffect(() => {
+    // 相机直接摆到门外起点，随后每帧向内 damp（否则会先倒退到起点再前进）
+    if (!reduceMotion) camera.position.z = startZ + introRef.current;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // 注：平滑一律用 damp（帧率无关的指数衰减）。固定系数 lerp 在帧率波动时
   // 平滑量逐帧不同（重场景帧率不稳），叠加 Lenis 自身平滑即产生肉眼可见的滚动抖动。
   useFrame((state, delta) => {
@@ -316,7 +341,8 @@ function CameraRig({
     }
     lookZOffRef.current = 0.9; // 退出聚焦即复位，下次聚焦仍是偏心构图
     const p = Math.max(0, Math.min(1, scrollRef.current ?? 0));
-    const targetZ = startZ + (endZ - startZ) * p;
+    introRef.current = THREE.MathUtils.damp(introRef.current, 0, 1.7, dt);
+    const targetZ = startZ + introRef.current + (endZ - startZ) * p;
     if (reduceMotion) {
       camera.position.z = targetZ;
       camera.position.x = 0;

@@ -56,6 +56,23 @@ export default function GatePage() {
     setView("gate");
   }, [setView]);
 
+  // 预热画廊资源：碎镜转场后 GalleryPage 首帧要解码的门图/尽头迷雾，
+  // 在首页停留期间提前拉进浏览器缓存——跳转后的「卡一下」主要是纹理解码
+  const dreams = useDreamStore((s) => s.dreams);
+  useEffect(() => {
+    const urls = [
+      "/textures/corridor-mist.png",
+      ...dreams
+        .slice(-8)
+        .map((d) => d.artifact.imageUrl)
+        .filter((u) => u && !u.startsWith("data:")),
+    ];
+    for (const u of urls) {
+      const im = new Image();
+      im.src = u;
+    }
+  }, [dreams]);
+
   // 首次挂载判定降级模式
   useEffect(() => {
     setMode(shouldUseFallback() ? "fallback" : "3d");
