@@ -41,19 +41,19 @@ const TEXTURES = [
     name: "mirror-frame",
     size: "1024x1536",
     prompt:
-      "tall ornate antique standing mirror frame, elegant baroque crest ornament at the top, dark aged bronze and near-black patina metal with faint violet sheen, slender side columns, complete frame shown in full, rectangular opening, portrait orientation, photographed perfectly straight-on and centered, the opening inside the frame is pure solid black, the background outside the frame is pure solid black, no glass, no reflection, no text",
+      "tall minimalist standing mirror frame, slim straight profile, dark aged bronze with subtle patina and a faint violet sheen, clean simple lines, no carving, no ornament, no crest, complete frame shown in full, rectangular opening, the frame border occupies about 9 percent of the image width on each side, portrait orientation, photographed perfectly straight-on and centered, the opening inside the frame is pure solid black, the background outside the frame is pure solid black, no glass, no reflection, no text",
+  },
+  {
+    name: "mirror-dream",
+    size: "1024x1536",
+    prompt:
+      "a dreamlike violet nebula dreamworld seen through a doorway: a luminous winding starlight path flowing through misty amethyst valleys toward a radiant spiral of light, floating spire islands in the distance, Belle Epoque dark fantasy oil painting style, painterly, full-bleed composition reaching every edge of the image, no frame, no arch, no border, no pillars, no vignette edges, no text",
   },
   {
     name: "cloud-bank",
     size: "1536x1024",
     prompt:
       "massive dark violet storm cloud bank emerging from a pure black background, painterly matte painting, moonlit silver-violet edges on the cloud tops, deep shadow cores, dramatic and quiet, the clouds occupy the lower two thirds, pure black elsewhere, no objects, no text",
-  },
-  {
-    name: "figure-silhouette",
-    size: "1024x1536",
-    prompt:
-      "perfect solid black silhouette of a standing person seen from behind, long coat, still and contemplative posture, centered, full figure, on a pure solid white background, high contrast, clean sharp edges, no gradients, no shadow on the ground, no text",
   },
   {
     name: "frame-simple",

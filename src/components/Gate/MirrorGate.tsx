@@ -10,7 +10,7 @@ import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import gsap from "gsap";
 import { useOptionalTexture } from "@/hooks/useOptionalTexture";
-import { usePunchedFrame, useKeyedSilhouette } from "@/hooks/useProcessedTexture";
+import { usePunchedFrame } from "@/hooks/useProcessedTexture";
 
 // 基调从近黑提到深紫灰：留白要有层次的「空」，不是漆黑（noomo 的暗都是有色温的）
 const FOG_COLOR = "#0d0c19";
@@ -278,8 +278,8 @@ function Shards({ triggered, nebula }: { triggered: boolean; nebula: THREE.Textu
   const groupRef = useRef<THREE.Group>(null);
   const COLS = 3;
   const ROWS = 5;
-  const SW = 2 / COLS; // 与镜面 2×3 精确对齐
-  const SH = 3 / ROWS;
+  const SW = 2.4 / COLS; // 与镜面 2.4×3.3 精确对齐
+  const SH = 3.3 / ROWS;
 
   const shardData = useMemo(() => {
     return Array.from({ length: COLS * ROWS }, (_, i) => {
@@ -471,25 +471,21 @@ function MirrorAndCamera({
     if (portalRef.current) {
       const pm = portalRef.current.material as THREE.MeshBasicMaterial;
       pm.opacity = 0;
-      tl.to(pm, { opacity: 1, duration: 0.8, ease: "power2.out" }, 0.5);
-      // 均匀放大到覆盖全屏（相机距画 ~4，fov50 需宽 ~6.7 → scale 3.6 留余量）
+      tl.to(pm, { opacity: 1, duration: 0.7, ease: "power2.out" }, 0.5);
+      // 均匀放大到覆盖全屏后提前收尾：末端 ~0.3s 是静止帧——
+      // 路由切换的主线程冻结落在静止画面上，肉眼不可见（静止剪辑）
       tl.to(
         portalRef.current.scale,
-        { x: 3.8, y: 3.8, duration: 1.8, ease: "power2.in" },
+        { x: 3.2, y: 3.2, duration: 1.5, ease: "power2.inOut" },
         0.5,
       );
     }
     tl.to(
       camera.position,
-      {
-        z: 4.1,
-        duration: 1.8,
-        ease: "power1.inOut",
-        delay: 0.5,
-        onComplete,
-      },
+      { z: 4.3, duration: 1.5, ease: "power1.inOut", delay: 0.5 },
       0,
     );
+    tl.call(onComplete, [], 2.3);
     return () => {
       tl.kill();
     };
@@ -499,7 +495,7 @@ function MirrorAndCamera({
     <group ref={groupRef}>
       {/* 镜面 = 望进梦境的星云传送门（黑镜的黑色四边形随视差歪斜会显得别扭） */}
       <mesh ref={mirrorRef} position={[0, 0, 0]}>
-        <planeGeometry args={[2, 3]} />
+        <planeGeometry args={[2.4, 3.3]} />
         <meshBasicMaterial map={mirrorMap} />
       </mesh>
       {/* 「画界」：碎镜后在镜框原位显影的梦境图（与镜面同尺寸同位置），
@@ -508,7 +504,7 @@ function MirrorAndCamera({
           注意：不用 visible=false 隐藏——opacity=0 保持渲染管线常驻，
           纹理/着色器在挂载时就上传编译好；否则触发瞬间首次上传 GPU 必掉帧 */}
       <mesh ref={portalRef} position={[0, 0, 0.12]}>
-        <planeGeometry args={[2, 3]} />
+        <planeGeometry args={[2.4, 3.3]} />
         <meshBasicMaterial map={nebula} transparent opacity={0} fog={false} depthWrite={false} />
       </mesh>
     </group>
@@ -520,10 +516,9 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
   const nebula = useMemo(makeNebulaTexture, []);
   const backdropCanvas = useMemo(makeBackdropTexture, []);
   // 定稿A「镜湖」素材（全部缺图回退现有画法）
-  // 实测开口：x 0.26 / 上 0.31（冠饰）/ 下 0.14
-  const mirrorFrameTex = usePunchedFrame("/textures/mirror-frame.png", 0.26, 0.31, 0.14);
+  // 简约直边立镜：实测开口 x 0.22~0.78 / y 0.085~0.915（含图幅黑边）
+  const mirrorFrameTex = usePunchedFrame("/textures/mirror-frame.png", 0.23, 0.09);
   const cloudTex = useOptionalTexture("/textures/cloud-bank.png");
-  const figureTex = useKeyedSilhouette("/textures/figure-silhouette.png");
   // 天幕真图：gpt-image matte painting（程序化色晕画不出空气感），缺图回退 canvas 版
   const backdropImg = useOptionalTexture("/textures/gate-backdrop.png");
   const backdrop = backdropImg ?? backdropCanvas;
@@ -581,26 +576,26 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
           depthScale={1}
           minDepthThreshold={0.4}
           maxDepthThreshold={1.2}
-          color="#0a0918"
-          metalness={0.7}
-          mirror={0.85}
+          color="#131129"
+          metalness={0.6}
+          mirror={0.8}
         />
       </mesh>
       {/* 地平线雾霭：柔光横带糊掉「地板黑平板 vs 天幕」的生硬接缝——
           远处地面应溶进空气里，而不是一条切线 */}
       <GlowPlane
         texture={glow}
-        position={[0, -1.35, -12.2]}
-        scale={[44, 4.6]}
+        position={[0, -1.2, -12.2]}
+        scale={[44, 5.6]}
         color="#6a5c9e"
-        opacity={0.17}
+        opacity={0.28}
       />
       <GlowPlane
         texture={glow}
-        position={[0, -1.55, -11.8]}
-        scale={[62, 3]}
+        position={[0, -1.45, -11.8]}
+        scale={[62, 3.6]}
         color="#4a3f78"
-        opacity={0.12}
+        opacity={0.2}
       />
       {/* 镜前地面光池：光瀑落地的光斑 */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.71, 0.9]} scale={[3.6, 2.2, 1]}>
@@ -617,10 +612,12 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
       {mirrorFrameTex ? (
         <group position={[0, 0, -0.06]}>
           {/* 定稿A：雕花立镜框（gpt-image 实物级，内窗抠透明对齐镜面） */}
-          {/* 窗宽=2(镜宽)/0.48，窗高=3/0.55；窗心相对图心偏下 → 面片上移 0.46 对齐镜心；
-              框脚略沉入水面 = 立于镜湖之中 */}
-          <mesh position={[0, 0.46, 0.02]}>
-            <planeGeometry args={[2 / 0.48, 3 / 0.55]} />
+          {/* 窗=2×3 对齐镜心；镜面 2.4×3.6 超填于后，杜绝露缝；
+              黑边余量已被键控成透明，不占画面 */}
+          {/* z=0.1（组内）→ 世界 0.04：必须在镜面(0)之前，框带才能压住超填的镜缘；
+              画界在 0.12 更前，吞没时盖框 ✓ */}
+          <mesh position={[0, 0, 0.1]}>
+            <planeGeometry args={[2 / 0.54, 3 / 0.83]} />
             <meshBasicMaterial map={mirrorFrameTex} transparent depthWrite={false} />
           </mesh>
           <GlowPlane texture={glow} position={[0, 0, -0.02]} scale={[3.4, 4.4]} color={ACCENT_3} opacity={0.26} />
@@ -632,23 +629,17 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
       {/* 定稿A：两侧云堤（加色混合黑底消隐；fog=false 保云的银边） */}
       {cloudTex && (
         <>
-          <mesh position={[-8.2, -0.6, -8]} rotation={[0, 0.55, 0]} scale={[15, 10, 1]}>
+          <mesh position={[-8.2, -1.0, -8]} rotation={[0, 0.55, 0]} scale={[15, 10, 1]}>
             <planeGeometry args={[1, 1]} />
             <meshBasicMaterial map={cloudTex} transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} fog={false} />
           </mesh>
-          <mesh position={[8.2, -0.3, -8.5]} rotation={[0, -0.55, 0]} scale={[-15, 10, 1]}>
+          <mesh position={[8.2, -0.7, -8.5]} rotation={[0, -0.55, 0]} scale={[-15, 10, 1]}>
             <planeGeometry args={[1, 1]} />
             <meshBasicMaterial map={cloudTex} transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} fog={false} />
           </mesh>
         </>
       )}
-      {/* 定稿A：镜前人影（尺度感来源——镜因人小而巨；你站在自己的梦前） */}
-      {figureTex && (
-        <mesh position={[0.5, -1.41, 2.3]}>
-          <planeGeometry args={[0.42, 0.63]} />
-          <meshBasicMaterial map={figureTex} transparent depthWrite={false} />
-        </mesh>
-      )}
+
       <MirrorAndCamera triggering={triggering} onComplete={onComplete} nebula={mirrorTex} act={act} />
       <Shards triggered={triggering} nebula={mirrorTex} />
       <DreamParticles texture={glow} />
