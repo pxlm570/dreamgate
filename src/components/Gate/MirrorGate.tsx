@@ -10,6 +10,7 @@ import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import gsap from "gsap";
 import { useOptionalTexture } from "@/hooks/useOptionalTexture";
+import { usePunchedFrame, useKeyedSilhouette } from "@/hooks/useProcessedTexture";
 
 // 基调从近黑提到深紫灰：留白要有层次的「空」，不是漆黑（noomo 的暗都是有色温的）
 const FOG_COLOR = "#0d0c19";
@@ -83,64 +84,6 @@ function makeBackdropTexture(): THREE.CanvasTexture {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.needsUpdate = true;
   return tex;
-}
-
-/** 生成光瀑贴图：上窄下宽的梯形光束，向下渐隐（美术馆顶光倾泻感） */
-function makeShaftTexture(): THREE.CanvasTexture {
-  const w = 256;
-  const h = 512;
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d")!;
-  const grad = ctx.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, "rgba(255,255,255,0.95)");
-  grad.addColorStop(0.4, "rgba(255,255,255,0.35)");
-  grad.addColorStop(1, "rgba(255,255,255,0)");
-  try {
-    // canvas filter blur 软化光束边缘（不支持的浏览器仅边缘略硬，无碍）
-    ctx.filter = "blur(14px)";
-  } catch {
-    /* noop */
-  }
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.moveTo(w * 0.38, 0);
-  ctx.lineTo(w * 0.62, 0);
-  ctx.lineTo(w * 0.92, h);
-  ctx.lineTo(w * 0.08, h);
-  ctx.closePath();
-  ctx.fill();
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.needsUpdate = true;
-  return tex;
-}
-
-/** 体积光瀑：两片交叉的光束面片，从上方倾泻到镜面（伪体积光，Bloom 加持） */
-function LightShaft({ texture }: { texture: THREE.Texture }) {
-  const matProps = {
-    map: texture,
-    transparent: true,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  } as const;
-  return (
-    <group position={[0, 2.35, -0.15]}>
-      <mesh>
-        <planeGeometry args={[3.4, 5.6]} />
-        <meshBasicMaterial {...matProps} color={ACCENT} opacity={0.32} />
-      </mesh>
-      <mesh rotation={[0, Math.PI / 5, 0]}>
-        <planeGeometry args={[3.0, 5.6]} />
-        <meshBasicMaterial {...matProps} color={ACCENT_3} opacity={0.2} />
-      </mesh>
-      <mesh rotation={[0, -Math.PI / 5, 0]}>
-        <planeGeometry args={[3.0, 5.6]} />
-        <meshBasicMaterial {...matProps} color="#ffffff" opacity={0.1} />
-      </mesh>
-    </group>
-  );
 }
 
 /**
@@ -485,7 +428,7 @@ function MirrorAndCamera({
         }
       }
       // 幕1 拉远一点 + 视线下移：镜面在画面里上移收小，底部文案区不再压住镜面
-      const baseZ = act === 0 ? 8.8 : 5.7;
+      const baseZ = act === 0 ? 9.6 : 5.7;
       const ax = act === 0 ? 0.8 : 0.42;
       const ay = act === 0 ? 0.32 : 0.18;
       const lookY = act === 0 ? 0 : -0.5;
@@ -574,9 +517,13 @@ function MirrorAndCamera({
 
 export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps) {
   const glow = useMemo(makeGlowTexture, []);
-  const shaft = useMemo(makeShaftTexture, []);
   const nebula = useMemo(makeNebulaTexture, []);
   const backdropCanvas = useMemo(makeBackdropTexture, []);
+  // 定稿A「镜湖」素材（全部缺图回退现有画法）
+  // 实测开口：x 0.26 / 上 0.31（冠饰）/ 下 0.14
+  const mirrorFrameTex = usePunchedFrame("/textures/mirror-frame.png", 0.26, 0.31, 0.14);
+  const cloudTex = useOptionalTexture("/textures/cloud-bank.png");
+  const figureTex = useKeyedSilhouette("/textures/figure-silhouette.png");
   // 天幕真图：gpt-image matte painting（程序化色晕画不出空气感），缺图回退 canvas 版
   const backdropImg = useOptionalTexture("/textures/gate-backdrop.png");
   const backdrop = backdropImg ?? backdropCanvas;
@@ -622,23 +569,21 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
         color={ACCENT_3}
         opacity={0.32}
       />
-      {/* 体积光瀑：光从上方倾泻在镜上（美术馆聚光的电影语言） */}
-      <LightShaft texture={shaft} />
       {/* 反射地板：镜子立于其上，倒影是最强的空间锚点 */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.72, -5]}>
         <planeGeometry args={[34, 34]} />
         <MeshReflectorMaterial
-          blur={[220, 60]}
+          blur={[120, 30]}
           resolution={512}
           mixBlur={1}
-          mixStrength={28}
-          roughness={0.8}
+          mixStrength={48}
+          roughness={0.35}
           depthScale={1}
           minDepthThreshold={0.4}
           maxDepthThreshold={1.2}
-          color="#0f0d1e"
-          metalness={0.45}
-          mirror={0.55}
+          color="#0a0918"
+          metalness={0.7}
+          mirror={0.85}
         />
       </mesh>
       {/* 地平线雾霭：柔光横带糊掉「地板黑平板 vs 天幕」的生硬接缝——
@@ -664,12 +609,46 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
           map={glow}
           color={ACCENT}
           transparent
-          opacity={0.38}
+          opacity={0.24}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
       </mesh>
-      <MirrorFrame glow={glow} />
+      {mirrorFrameTex ? (
+        <group position={[0, 0, -0.06]}>
+          {/* 定稿A：雕花立镜框（gpt-image 实物级，内窗抠透明对齐镜面） */}
+          {/* 窗宽=2(镜宽)/0.48，窗高=3/0.55；窗心相对图心偏下 → 面片上移 0.46 对齐镜心；
+              框脚略沉入水面 = 立于镜湖之中 */}
+          <mesh position={[0, 0.46, 0.02]}>
+            <planeGeometry args={[2 / 0.48, 3 / 0.55]} />
+            <meshBasicMaterial map={mirrorFrameTex} transparent depthWrite={false} />
+          </mesh>
+          <GlowPlane texture={glow} position={[0, 0, -0.02]} scale={[3.4, 4.4]} color={ACCENT_3} opacity={0.26} />
+          <GlowPlane texture={glow} position={[0, 0, -0.04]} scale={[5.2, 6.2]} color={ACCENT} opacity={0.12} />
+        </group>
+      ) : (
+        <MirrorFrame glow={glow} />
+      )}
+      {/* 定稿A：两侧云堤（加色混合黑底消隐；fog=false 保云的银边） */}
+      {cloudTex && (
+        <>
+          <mesh position={[-8.2, -0.6, -8]} rotation={[0, 0.55, 0]} scale={[15, 10, 1]}>
+            <planeGeometry args={[1, 1]} />
+            <meshBasicMaterial map={cloudTex} transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} fog={false} />
+          </mesh>
+          <mesh position={[8.2, -0.3, -8.5]} rotation={[0, -0.55, 0]} scale={[-15, 10, 1]}>
+            <planeGeometry args={[1, 1]} />
+            <meshBasicMaterial map={cloudTex} transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} fog={false} />
+          </mesh>
+        </>
+      )}
+      {/* 定稿A：镜前人影（尺度感来源——镜因人小而巨；你站在自己的梦前） */}
+      {figureTex && (
+        <mesh position={[0.5, -1.41, 2.3]}>
+          <planeGeometry args={[0.42, 0.63]} />
+          <meshBasicMaterial map={figureTex} transparent depthWrite={false} />
+        </mesh>
+      )}
       <MirrorAndCamera triggering={triggering} onComplete={onComplete} nebula={mirrorTex} act={act} />
       <Shards triggered={triggering} nebula={mirrorTex} />
       <DreamParticles texture={glow} />
