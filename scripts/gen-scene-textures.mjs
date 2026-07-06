@@ -62,12 +62,6 @@ const TEXTURES = [
       "minimalist dark walnut wood gallery picture frame, slim straight profile, one thin subtle antique gold inner lip line, elegant and understated museum framing, complete rectangular frame shown in full, frame border occupies about 8 percent of the image width on each side, portrait orientation, photographed perfectly straight-on and centered, the opening inside the frame is pure solid black, the background outside the frame is pure solid black, no carving, no ornament, no reflection, no text",
   },
   {
-    name: "frame-ornate",
-    size: "1024x1536",
-    prompt:
-      "ornate antique gilded picture frame, Belle Epoque style, complete rectangular frame shown in full, elaborate carved gold moulding with soft patina and worn gilt highlights, frame border occupies about 15 percent of the image width on each side, portrait orientation, photographed perfectly straight-on and centered, the opening inside the frame is pure solid black, the background outside the frame is pure solid black, no painting, no glass reflection, no text",
-  },
-  {
     name: "ceiling-coffer",
     size: "1024x1024",
     prompt:
