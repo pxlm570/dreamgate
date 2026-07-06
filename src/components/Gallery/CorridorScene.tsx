@@ -141,7 +141,7 @@ function CorridorDust({ length, color, texture }: { length: number; color: strin
 }
 
 /** 走廊墙壁：地板（MeshReflectorMaterial 反射）+ 天花板 + 左右墙 + 远端封口 + 尽头光源 */
-function CorridorWalls({ length, accentColor, glowTex, endMist, wallPanel }: { length: number; accentColor: string; glowTex: THREE.Texture; endMist: THREE.Texture | null; wallPanel: THREE.Texture | null }) {
+function CorridorWalls({ length, accentColor, glowTex, endMist, wallPanel, floorBase }: { length: number; accentColor: string; glowTex: THREE.Texture; endMist: THREE.Texture | null; wallPanel: THREE.Texture | null; floorBase: THREE.Texture | null }) {
   // 墙体向尽头方向大幅延长：让走廊管道在雾中隐没，而非露出方形开口
   // （之前 +16 会在尽头露出背景色的方形截面——「字的背景像塑料板」的元凶）
   const wallLen = length + 90;
@@ -153,23 +153,54 @@ function CorridorWalls({ length, accentColor, glowTex, endMist, wallPanel }: { l
     t.repeat.set(Math.max(wallLen / 8, 1), 1);
     return t;
   }, [wallLen]);
+  // 护墙板逐墙对齐：瓦片=8 个世界单位（同侧门间距），把门位对到瓦片中心
+  // （中心是两块嵌板之间的壁柱位，被门覆盖；嵌板恰好分列门两侧）。
+  // 左墙 u 起点在 z=+20 → 门(z=0,-8…)相位恒为 0.5，无需补偿；
+  // 右墙 u 起点随走廊长度变化 → 按 length 计算相位差补到 0.5。
+  const wallTex = useMemo(() => {
+    if (!wallPanel) return { left: null as THREE.Texture | null, right: null as THREE.Texture | null };
+    const mk = (offsetX: number) => {
+      const t = wallPanel.clone();
+      t.wrapS = THREE.RepeatWrapping;
+      t.wrapT = THREE.ClampToEdgeWrapping;
+      t.repeat.set(wallLen / 8, 1);
+      t.offset.x = offsetX;
+      t.needsUpdate = true;
+      return t;
+    };
+    const rightPhase = ((((length + 66) / 8) % 1) + 1) % 1;
+    return { left: mk(0), right: mk(0.5 - rightPhase) };
+  }, [wallPanel, wallLen, length]);
+  // 地板拼花：3×3 世界单位一瓦
+  const floorTex = useMemo(() => {
+    if (!floorBase) return null;
+    const t = floorBase.clone();
+    t.wrapS = THREE.RepeatWrapping;
+    t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(2, wallLen / 3);
+    t.needsUpdate = true;
+    return t;
+  }, [floorBase, wallLen]);
   return (
     <group>
-      {/* 地板：深色反射地面（光池/画作倒影承担空间感） */}
+      {/* 地板：拼花木地板（gpt-image）+ 克制的反射——
+          纯色+强模糊反射会读成塑料板；木纹为主、倒影为辅才像打过蜡的美术馆地面 */}
       <mesh position={[0, -CORRIDOR_HALF_HEIGHT, centerZ]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[6, wallLen]} />
         <MeshReflectorMaterial
+          key={floorTex ? "floor-tex" : "floor-plain"}
           blur={[300, 80]}
           resolution={384}
           mixBlur={1}
-          mixStrength={20}
-          roughness={0.85}
+          mixStrength={floorTex ? 2.2 : 20}
+          roughness={floorTex ? 0.92 : 0.85}
           depthScale={1}
           minDepthThreshold={0.4}
           maxDepthThreshold={1.2}
-          color="#0c0b18"
-          metalness={0.5}
-          mirror={0.4}
+          map={floorTex ?? undefined}
+          color={floorTex ? "#ffffff" : "#0c0b18"}
+          metalness={floorTex ? 0.12 : 0.5}
+          mirror={floorTex ? 0.12 : 0.4}
         />
       </mesh>
       {/* 天花板：哑光深邃 */}
@@ -182,8 +213,8 @@ function CorridorWalls({ length, accentColor, glowTex, endMist, wallPanel }: { l
       <mesh position={[-DOOR_OFFSET_X, 0, centerZ]} rotation={[0, Math.PI / 2, 0]}>
         <planeGeometry args={[wallLen, 6]} />
         <meshStandardMaterial
-          map={wallPanel ?? wallGrad}
-          emissiveMap={wallPanel ?? wallGrad}
+          map={wallTex.left ?? wallGrad}
+          emissiveMap={wallTex.left ?? wallGrad}
           emissive="#9c92c0"
           emissiveIntensity={0.34}
           color="#ffffff"
@@ -195,8 +226,8 @@ function CorridorWalls({ length, accentColor, glowTex, endMist, wallPanel }: { l
       <mesh position={[DOOR_OFFSET_X, 0, centerZ]} rotation={[0, -Math.PI / 2, 0]}>
         <planeGeometry args={[wallLen, 6]} />
         <meshStandardMaterial
-          map={wallPanel ?? wallGrad}
-          emissiveMap={wallPanel ?? wallGrad}
+          map={wallTex.right ?? wallGrad}
+          emissiveMap={wallTex.right ?? wallGrad}
           emissive="#9c92c0"
           emissiveIntensity={0.34}
           color="#ffffff"
@@ -350,7 +381,8 @@ function CameraRig({
       camera.position.x = 0;
       camera.position.y = 0;
     } else {
-      camera.position.z = THREE.MathUtils.damp(camera.position.z, targetZ, 8, dt);
+      // 逐画驻足模式：目标 z 是离散停点，lambda 放缓成 ~1.2s 的幕间滑行
+      camera.position.z = THREE.MathUtils.damp(camera.position.z, targetZ, 3.4, dt);
       camera.position.x = THREE.MathUtils.damp(camera.position.x, state.pointer.x * 0.45, 3, dt);
       camera.position.y = THREE.MathUtils.damp(camera.position.y, state.pointer.y * 0.25, 3, dt);
     }
@@ -441,8 +473,10 @@ export function CorridorScene({
   const glowTex = useMemo(makeGlowTexture, []);
   // 尽头迷雾真图（gpt-image）：缺图回退程序化径向柔光
   const endMist = useOptionalTexture("/textures/corridor-mist.png");
-  // 护墙板墙面（gpt-image 烘焙光）：每 8 个世界单位一个镜像瓦片
-  const wallPanel = useOptionalTexture("/textures/wall-panel.png", (length + 90) / 8, 1);
+  // 护墙板墙面（gpt-image 烘焙光）：基础纹理，逐墙克隆时再设平铺与相位
+  const wallPanel = useOptionalTexture("/textures/wall-panel.png");
+  // 拼花木地板（gpt-image 油画质感）：反射材质的底图——纯色模糊反射=塑料感根因
+  const floorTexBase = useOptionalTexture("/textures/floor-parquet.png");
 
   return (
     <Canvas
@@ -459,7 +493,7 @@ export function CorridorScene({
       <hemisphereLight color={accentColor} groundColor={FOG_BASE} intensity={0.34} />
       <pointLight position={[0, 4, 2]} intensity={0.6} color={accentColor} distance={15} />
       <pointLight position={[0, -2, 4]} intensity={0.3} color="#c9b8e8" distance={10} />
-      <CorridorWalls length={length} accentColor={accentColor} glowTex={glowTex} endMist={endMist} wallPanel={wallPanel} />
+      <CorridorWalls length={length} accentColor={accentColor} glowTex={glowTex} endMist={endMist} wallPanel={wallPanel} floorBase={floorTexBase} />
       <CameraRig scrollRef={scrollRef} length={length} reduceMotion={reduceMotion} focusTarget={focusTarget} diving={diving} />
       {!reduceMotion && <CorridorDust length={length} color={accentColor} texture={glowTex} />}
       {!reduceMotion && <FpsSampler onLow={onLowPerformance} />}

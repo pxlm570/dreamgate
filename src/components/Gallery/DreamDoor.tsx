@@ -280,24 +280,29 @@ export function DreamDoor({
           emissiveIntensity={0.06}
         />
       </mesh>
-      {/* 卡纸（mat）：暖白内衬——画作被「装裱」而非悬浮 */}
-      <mesh position={[0, 0, -0.02]}>
-        <planeGeometry args={[DOOR_W + 0.26, DOOR_H + 0.26]} />
-        <meshStandardMaterial
-          color="#d9d4c8"
-          roughness={0.92}
-          metalness={0}
-          emissive="#fffdf5"
-          emissiveIntensity={lit ? 0.14 : 0.07}
-        />
-      </mesh>
-      {/* 鎏金内衬（Belle Époque 装裱语言）：哑光鎏金。
-          不能用高 metalness——无环境贴图的裸金属只剩点光镜面高光，
-          相机一动就镜面锯齿闪烁（sparkle）；basic 平色金 + Bloom 微光最稳 */}
-      <mesh position={[0, 0, 0.0]}>
-        <planeGeometry args={[DOOR_W + 0.1, DOOR_H + 0.1]} />
-        <meshBasicMaterial color="#89702f" />
-      </mesh>
+      {/* 真实鎏金画框（Belle Époque 油画配厚金框，不配卡纸）：
+          四根有厚度的框条，凸出于画面之前——
+          之前的细平面金边远看只剩亚像素细线，必然锯齿闪烁；
+          有体积的框条有明暗面、多像素宽，稳定且有分量 */}
+      <group position={[0, 0, 0.05]}>
+        {[
+          { pos: [0, DOOR_H / 2 + 0.11, 0] as const, size: [DOOR_W + 0.44, 0.22, 0.07] as const },
+          { pos: [0, -(DOOR_H / 2 + 0.11), 0] as const, size: [DOOR_W + 0.44, 0.22, 0.07] as const },
+          { pos: [-(DOOR_W / 2 + 0.11), 0, 0] as const, size: [0.22, DOOR_H, 0.07] as const },
+          { pos: [DOOR_W / 2 + 0.11, 0, 0] as const, size: [0.22, DOOR_H, 0.07] as const },
+        ].map((bar, i) => (
+          <mesh key={i} position={[bar.pos[0], bar.pos[1], bar.pos[2]]}>
+            <boxGeometry args={[bar.size[0], bar.size[1], bar.size[2]]} />
+            <meshStandardMaterial
+              color="#7d6330"
+              metalness={0.45}
+              roughness={0.55}
+              emissive="#4f3d15"
+              emissiveIntensity={0.35}
+            />
+          </mesh>
+        ))}
+      </group>
       {/* 射灯洗墙光：从画上方倾泻在墙上的暖白光斑（美术馆 track light 打在墙面） */}
       {glowTex && (
         <mesh position={[0, 1.1, -0.1]} scale={[3.6, 4.4, 1]}>

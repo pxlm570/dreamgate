@@ -453,7 +453,7 @@ function MirrorAndCamera({
   const portalRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
   const lookYRef = useRef(0);
-  const { camera, scene } = useThree();
+  const { camera } = useThree();
 
   // idle 阶段：视差全部交给相机环绕漂移；镜面不再自转
   // （镜面倾斜会与固定镜框/发光缘产生相对错动，正是「黑色部分随鼠标变形」的来源）
@@ -492,13 +492,13 @@ function MirrorAndCamera({
 
   useEffect(() => {
     if (!triggering) return;
-    const fog = scene.fog as THREE.FogExp2 | null;
     const tl = gsap.timeline();
-    // 时序三拍（拍落完再起下一拍，节奏读得清）：
+    // 时序三拍（画从框中生长，相机几乎不动）：
     //   第1拍 0~0.55s   碎裂——镜面消失、碎片起飞、白闪
-    //   第2拍 0.6~1.5s  显影——碎片让出中心后「画界」浮现
-    //   第3拍 0.6~2.3s  坠入——相机 power2.in 从静止加速冲向画面（坠落感），
-    //                   前 0.6s 相机几乎不动，与碎裂拍错开
+    //   第2拍 0.5s~     显影——「画界」在镜框原位浮现（与镜面同尺寸同位置）
+    //   第3拍 0.5~2.3s  吞没——画自框中向观者生长，直到充满整个画面。
+    //   相机只轻微前倾。之前的方案是相机加速穿过门框飞行：门框从身边
+    //   掠过=「门框和画分离」的穿帮 + 近平面裁剪的突兀感，已废弃。
     if (mirrorRef.current) {
       tl.to(
         mirrorRef.current.scale,
@@ -509,24 +509,21 @@ function MirrorAndCamera({
     if (portalRef.current) {
       const pm = portalRef.current.material as THREE.MeshBasicMaterial;
       pm.opacity = 0;
-      tl.to(pm, { opacity: 1, duration: 0.9, ease: "power2.out" }, 0.6);
+      tl.to(pm, { opacity: 1, duration: 0.8, ease: "power2.out" }, 0.5);
+      // 均匀放大到覆盖全屏（相机距画 ~4，fov50 需宽 ~6.7 → scale 3.6 留余量）
       tl.to(
         portalRef.current.scale,
-        { x: 1.22, y: 1.22, duration: 1.7, ease: "power1.in" },
-        0.6,
+        { x: 3.8, y: 3.8, duration: 1.8, ease: "power2.in" },
+        0.5,
       );
-    }
-    if (fog) {
-      // 雾只轻微加浓：0.34 会把碎片和门框灰化成一锅粥（画界 fog=false 不受影响）
-      tl.to(fog, { density: 0.2, duration: 1.7, ease: "power2.in" }, 0.3);
     }
     tl.to(
       camera.position,
       {
-        z: -3.2,
-        duration: 1.7,
-        ease: "power2.in",
-        delay: 0.6,
+        z: 4.1,
+        duration: 1.8,
+        ease: "power1.inOut",
+        delay: 0.5,
         onComplete,
       },
       0,
@@ -534,7 +531,7 @@ function MirrorAndCamera({
     return () => {
       tl.kill();
     };
-  }, [triggering, camera, scene, onComplete]);
+  }, [triggering, camera, onComplete]);
 
   return (
     <group ref={groupRef}>
@@ -543,12 +540,13 @@ function MirrorAndCamera({
         <planeGeometry args={[2, 3]} />
         <meshBasicMaterial map={nebula} />
       </mesh>
-      {/* 「画界」：碎镜后在镜后显影的整幅梦境图（与镜面同源），相机坠入其中。
-          fog=false 保画面鲜活（穿雾时不被灰化）。
+      {/* 「画界」：碎镜后在镜框原位显影的梦境图（与镜面同尺寸同位置），
+          随后自框中向观者生长直至吞没画面——画框始终被画覆盖，无分离穿帮。
+          fog=false 保画面鲜活。
           注意：不用 visible=false 隐藏——opacity=0 保持渲染管线常驻，
           纹理/着色器在挂载时就上传编译好；否则触发瞬间首次上传 GPU 必掉帧 */}
-      <mesh ref={portalRef} position={[0, 0, -3.6]}>
-        <planeGeometry args={[7.2, 10.8]} />
+      <mesh ref={portalRef} position={[0, 0, 0.12]}>
+        <planeGeometry args={[2, 3]} />
         <meshBasicMaterial map={nebula} transparent opacity={0} fog={false} depthWrite={false} />
       </mesh>
     </group>

@@ -38,6 +38,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const TEXTURES = [
   {
+    name: "floor-parquet",
+    size: "1024x1024",
+    prompt:
+      "seamless tileable texture of dark herringbone parquet wood floor viewed from directly above, very dark espresso brown-black oak with subtle grain, painterly oil texture with faint visible brushwork, soft satin sheen baked in, Belle Epoque interior floor, muted, elegant, near-black, no objects, no text, flat top-down view, texture only",
+  },
+  {
     name: "wall-panel",
     size: "1536x1024",
     prompt:

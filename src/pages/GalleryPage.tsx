@@ -6,9 +6,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Moon, Plus, ArrowRight, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import Lenis from "lenis";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useDreamStore } from "@/store/useDreamStore";
 import { useDegradation, triggerDegradation } from "@/lib/degradation";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
@@ -19,7 +16,6 @@ import { CorridorScene, ParallaxGallery, EmptyGallery, GalleryModeToggle, type G
 import { loadSeeds, SEED_DREAMS } from "@/data/seedDreams";
 import type { Dream } from "@/lib/types";
 
-gsap.registerPlugin(ScrollTrigger);
 const STORAGE_KEY = "dg-gallery-mode";
 const SEEDS_AUTO_LOADED_KEY = "dreamgate-seeds-auto-loaded";
 
@@ -136,29 +132,47 @@ export default function GalleryPage() {
     enterDream(d);
   };
 
-  // Lenis + ScrollTrigger 联动驱动 3D 相机；reduce-motion 时退化为原生 scroll
+  // kimi 式逐画驻足（3D 模式无滚动条）：一格滚轮/一次滑动 = 运镜到下一幅画前站定。
+  // 连续滚动的「路过感」变成策展人带你逐幅看展的「驻足节奏」——
+  // 分幕感从首页一直延续进走廊。
+  const [stop, setStop] = useState(0);
+  const stopLockRef = useRef(0);
+  const recentCount = Math.min(dreams.length, 20);
   useEffect(() => {
-    if (mode !== "3d" || dreams.length === 0) return;
-    if (reduceMotion) {
-      const onScroll = () => {
-        const max = document.documentElement.scrollHeight - window.innerHeight;
-        scrollRef.current = max > 0 ? window.scrollY / max : 0;
-      };
-      window.addEventListener("scroll", onScroll, { passive: true });
-      onScroll();
-      return () => window.removeEventListener("scroll", onScroll);
-    }
-    const lenis = new Lenis({ lerp: 0.1, smoothWheel: true });
-    lenis.on("scroll", () => ScrollTrigger.update());
-    const tickerFn = (t: number) => lenis.raf(t * 1000);
-    gsap.ticker.add(tickerFn);
-    gsap.ticker.lagSmoothing(0);
-    const st = ScrollTrigger.create({
-      start: 0, end: "max", scrub: true,
-      onUpdate: (self) => { scrollRef.current = self.progress; },
-    });
-    return () => { lenis.destroy(); gsap.ticker.remove(tickerFn); st.kill(); };
-  }, [mode, dreams.length, reduceMotion]);
+    if (mode !== "3d" || recentCount === 0) return;
+    const maxStop = recentCount; // 末档 = 走廊尽头「仍未发现的梦境」
+    const advance = (dir: number) => {
+      if (focused || diving) return; // 驻足/入画中不走位
+      const now = performance.now();
+      if (now - stopLockRef.current < 900) return; // 一格=一次完整运镜
+      stopLockRef.current = now;
+      setStop((s) => Math.max(0, Math.min(maxStop, s + dir)));
+    };
+    const onWheel = (e: WheelEvent) => advance(e.deltaY > 0 ? 1 : -1);
+    let touchY = 0;
+    const onTouchStart = (e: TouchEvent) => { touchY = e.touches[0]?.clientY ?? 0; };
+    const onTouchEnd = (e: TouchEvent) => {
+      const dy = touchY - (e.changedTouches[0]?.clientY ?? touchY);
+      if (Math.abs(dy) > 40) advance(dy > 0 ? 1 : -1);
+    };
+    window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [mode, recentCount, focused, diving]);
+
+  // 驻足档位 → 相机进度：门 i 的停点在画前 2.4 处；末档走到尽头
+  useEffect(() => {
+    if (mode !== "3d" || recentCount === 0) return;
+    const startZ = 4;
+    const endZ = -(recentCount - 1) * 4 - 4;
+    const zi = stop >= recentCount ? endZ : -stop * 4 + 2.4;
+    scrollRef.current = (zi - startZ) / (endZ - startZ);
+  }, [stop, mode, recentCount]);
 
   if (!loaded) return <div className="min-h-screen bg-dreamgate-deep" />;
   if (dreams.length === 0) {
@@ -234,12 +248,11 @@ export default function GalleryPage() {
         {!withShaderFog && <Fog className="pointer-events-none fixed inset-0 z-[1]" intensity={0.5} color={accentColor} />}
         {header}
         {a11yList}
-        <div aria-hidden style={{ height: `${recent.length * 80 + 60}vh` }} />
-        {/* 漫游提示（聚焦时隐去） */}
+        {/* 驻足提示（聚焦时隐去）；kimi 式无滚动条——页面不再需要占位高度 */}
         {!focused && (
           <div className="pointer-events-none fixed inset-x-0 bottom-6 z-20 flex justify-center">
             <Caption as="div" className="animate-pulse-glow rounded-full border border-white/10 bg-dreamgate-elevated/40 px-4 py-1.5 text-[11px] uppercase tracking-widest backdrop-blur-md">
-              滚动 · 漫游走廊 · 点击画作驻足
+              滚动 · 逐画前行{stop > 0 ? ` · ${Math.min(stop + 1, recentCount)} / ${recentCount}` : ""} · 点击画作驻足
             </Caption>
           </div>
         )}
