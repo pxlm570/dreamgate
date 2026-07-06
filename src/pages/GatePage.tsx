@@ -106,9 +106,14 @@ export default function GatePage() {
     setPhase("done");
   }, []);
 
-  // 完成后跳转画廊
+  // 完成后跳转画廊（置匹配剪辑标记：画廊首帧用同一张梦境图接住门的末帧）
   useEffect(() => {
     if (phase !== "done") return;
+    try {
+      sessionStorage.setItem("dg-matchcut", "1");
+    } catch {
+      /* ignore */
+    }
     setView("gallery");
     navigate("/gallery");
   }, [phase, navigate, setView]);
@@ -153,17 +158,8 @@ export default function GatePage() {
           }}
         />
       )}
-      {/* 末端暗场：注意条件是 phase!=="idle"——onComplete 置 done 后遮罩必须继续在场，
-          否则全黑刚盖住的瞬间被卸载，会闪回门的画面再跳转（转场生硬的元凶） */}
-      {phase !== "idle" && (
-        <motion.div
-          key="dive-end"
-          className="pointer-events-none absolute inset-0 z-30 bg-dreamgate-deep"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.55, ease: "easeIn", delay: 1.75 }}
-        />
-      )}
+      {/* 匹配剪辑方案下不再压黑：门的末帧（梦境图满屏）直接被画廊首帧
+          的同一张图接住——黑场本身就是「卡一下」的观感来源 */}
     </AnimatePresence>
   );
 

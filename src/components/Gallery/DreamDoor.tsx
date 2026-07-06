@@ -116,16 +116,16 @@ function loadOrnateFrame(): Promise<THREE.Texture | null> {
   if (ornatePromise) return ornatePromise;
   ornatePromise = new Promise((resolve) => {
     const img = new Image();
-    img.src = "/textures/frame-ornate.png";
+    img.src = "/textures/frame-simple.png";
     img.onload = () => {
       const c = document.createElement("canvas");
       c.width = img.width;
       c.height = img.height;
       const ctx = c.getContext("2d")!;
       ctx.drawImage(img, 0, 0);
-      // 内窗抠透明（羽化 18px）：留 ~15% 边作框体
-      const inX = c.width * 0.155;
-      const inY = c.height * 0.145;
+      // 内窗抠透明（羽化 18px）：简约框边窄，抠窗按实测边宽
+      const inX = c.width * 0.135;
+      const inY = c.height * 0.1;
       ctx.globalCompositeOperation = "destination-out";
       try {
         ctx.filter = "blur(18px)";
@@ -334,10 +334,11 @@ export function DreamDoor({
           emissiveIntensity={0.06}
         />
       </mesh>
-      {/* 真实雕花鎏金画框（gpt-image 实物级）：内窗已抠透明，画作从窗中透出 */}
+      {/* 真实画框（gpt-image 实物级 · 简约深木+细金线，不抢画面）：
+          内窗已抠透明，画作从窗中透出；plane 尺寸按窗占比反推 */}
       {ornate && (
         <mesh position={[0, 0, 0.06]}>
-          <planeGeometry args={[DOOR_W + 0.62, DOOR_H + 0.66]} />
+          <planeGeometry args={[DOOR_W / 0.73, DOOR_H / 0.8]} />
           <meshBasicMaterial map={ornate} transparent depthWrite={false} />
         </mesh>
       )}
@@ -444,9 +445,9 @@ export function DreamDoor({
           <meshBasicMaterial
             ref={poolMatRef}
             map={glowTex}
-            color={emotionColor}
+            color="#e9e2d2"
             transparent
-            opacity={0.18}
+            opacity={0.16}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />

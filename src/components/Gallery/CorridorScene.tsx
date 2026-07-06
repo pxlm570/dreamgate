@@ -225,9 +225,9 @@ function CorridorWalls({ length, accentColor, glowTex, endMist, wallPanel, floor
           <meshStandardMaterial
             map={ceilTex}
             emissiveMap={ceilTex}
-            emissive="#6a6288"
-            emissiveIntensity={0.24}
-            color="#ffffff"
+            emissive="#494360"
+            emissiveIntensity={0.1}
+            color="#7d7691"
             metalness={0.05}
             roughness={0.95}
           />

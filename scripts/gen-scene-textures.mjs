@@ -38,6 +38,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const TEXTURES = [
   {
+    name: "frame-simple",
+    size: "1024x1536",
+    prompt:
+      "minimalist dark walnut wood gallery picture frame, slim straight profile, one thin subtle antique gold inner lip line, elegant and understated museum framing, complete rectangular frame shown in full, frame border occupies about 8 percent of the image width on each side, portrait orientation, photographed perfectly straight-on and centered, the opening inside the frame is pure solid black, the background outside the frame is pure solid black, no carving, no ornament, no reflection, no text",
+  },
+  {
     name: "frame-ornate",
     size: "1024x1536",
     prompt:

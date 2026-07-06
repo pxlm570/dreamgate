@@ -11,7 +11,7 @@ import { useDegradation, triggerDegradation } from "@/lib/degradation";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { getEmotionByWord } from "@/lib/emotions";
 import { Fog } from "@/components/Atmosphere";
-import { Button, Display, Caption, EntranceVeil } from "@/components/ui";
+import { Button, Display, Caption, EntranceVeil, MatchCutReveal } from "@/components/ui";
 import { CorridorScene, ParallaxGallery, EmptyGallery, GalleryModeToggle, type GalleryMode } from "@/components/Gallery";
 import { loadSeeds, SEED_DREAMS } from "@/data/seedDreams";
 import type { Dream } from "@/lib/types";
@@ -39,6 +39,23 @@ export default function GalleryPage() {
   const [focused, setFocused] = useState<Dream | null>(null);
   // 入画中：相机向画面俯冲 + 页面淡出，随后跳转（内容即门——穿过画作进入梦境）
   const [diving, setDiving] = useState(false);
+  // 匹配剪辑标记（镜之门跳转前置位）：画廊首帧用同一张梦境图接住门的末帧
+  // 注意：初始化器只读不删——StrictMode 会把 useState 初始化器跑两遍，
+  // 带副作用的消费会让第二遍读空；删除放到 effect 里
+  const [matchCut] = useState(() => {
+    try {
+      return sessionStorage.getItem("dg-matchcut") === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem("dg-matchcut");
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     setView("gallery");
@@ -238,8 +255,8 @@ export default function GalleryPage() {
     const focusSide = focusIdx >= 0 && focusIdx % 2 === 0 ? -1 : 1;
     return (
       <div className="relative bg-dreamgate-deep">
-        {/* 入场揭幕：与镜之门末端暗场无缝衔接（组件内含 JS 定时卸载兜底） */}
-        <EntranceVeil />
+        {/* 入场揭幕：来自镜之门 → 匹配剪辑（同图接帧）；直接进入 → 深色幕布 */}
+        {matchCut ? <MatchCutReveal /> : <EntranceVeil />}
         <div className="fixed inset-0 z-0">
           <CorridorScene
             dreams={dreams}
