@@ -68,12 +68,22 @@ export function DreamImmersive({ dream, onImageError }: DreamImmersiveProps) {
       {/* ===== 舞台：全屏梦境图（fixed，滚动时缓慢推近） ===== */}
       <div className="fixed inset-0 z-0 overflow-hidden bg-dreamgate-deep">
         {artifact.imageUrl ? (
-          <motion.div style={reduceMotion ? undefined : { scale: imgScale }} className="h-full w-full">
+          <motion.div style={reduceMotion ? undefined : { scale: imgScale }} className="relative h-full w-full">
+            {/* 底层：同图模糊放大铺满（补足画幅外的空间，不暴力裁切原作） */}
+            <img
+              src={artifact.imageUrl}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 h-full w-full scale-110 object-cover"
+              style={{ filter: "blur(36px) brightness(0.5) saturate(1.05)" }}
+            />
+            {/* 主层：完整画幅居中呈现——画是被观看的原作，不是被裁切的壁纸 */}
             <img
               src={artifact.imageUrl}
               alt="梦境画作"
               onError={onImageError}
-              className={cn("h-full w-full object-cover", filterClass)}
+              className={cn("relative h-full w-full object-contain", filterClass)}
+              style={{ filter: "drop-shadow(0 24px 80px rgba(0,0,0,0.75))" }}
             />
           </motion.div>
         ) : (

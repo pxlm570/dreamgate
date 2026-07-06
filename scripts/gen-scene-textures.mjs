@@ -38,6 +38,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const TEXTURES = [
   {
+    name: "frame-ornate",
+    size: "1024x1536",
+    prompt:
+      "ornate antique gilded picture frame, Belle Epoque style, complete rectangular frame shown in full, elaborate carved gold moulding with soft patina and worn gilt highlights, frame border occupies about 15 percent of the image width on each side, portrait orientation, photographed perfectly straight-on and centered, the opening inside the frame is pure solid black, the background outside the frame is pure solid black, no painting, no glass reflection, no text",
+  },
+  {
+    name: "ceiling-coffer",
+    size: "1024x1024",
+    prompt:
+      "seamless tileable texture of a dark Belle Epoque coffered ceiling viewed from directly below, deep charcoal-violet wooden coffers in a regular grid, faint aged gold trim lines catching dim light, painterly oil texture, baked soft ambient lighting, near-black overall, muted, elegant, no chandelier, no objects, no text, flat view, texture only",
+  },
+  {
     name: "floor-parquet",
     size: "1024x1024",
     prompt:

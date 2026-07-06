@@ -106,6 +106,59 @@ function getInnerShadowTexture(): THREE.CanvasTexture {
   return tex;
 }
 
+/**
+ * 雕花鎏金画框贴图（gpt-image 实物级金框，模块级缓存）：
+ * 加载后在 canvas 里把内窗抠成透明（羽化边缘），叠在画作前=真实装裱。
+ * 几何拼的金属条永远是"塑料条"——真framequality只能来自真图。
+ */
+let ornatePromise: Promise<THREE.Texture | null> | null = null;
+function loadOrnateFrame(): Promise<THREE.Texture | null> {
+  if (ornatePromise) return ornatePromise;
+  ornatePromise = new Promise((resolve) => {
+    const img = new Image();
+    img.src = "/textures/frame-ornate.png";
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.width;
+      c.height = img.height;
+      const ctx = c.getContext("2d")!;
+      ctx.drawImage(img, 0, 0);
+      // 内窗抠透明（羽化 18px）：留 ~15% 边作框体
+      const inX = c.width * 0.155;
+      const inY = c.height * 0.145;
+      ctx.globalCompositeOperation = "destination-out";
+      try {
+        ctx.filter = "blur(18px)";
+      } catch {
+        /* 老浏览器无 filter：硬边窗口，可接受 */
+      }
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(inX, inY, c.width - inX * 2, c.height - inY * 2);
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 8;
+      t.needsUpdate = true;
+      resolve(t);
+    };
+    img.onerror = () => resolve(null);
+  });
+  return ornatePromise;
+}
+
+function useOrnateFrame(): THREE.Texture | null {
+  const [tex, setTex] = useState<THREE.Texture | null>(null);
+  useEffect(() => {
+    let active = true;
+    loadOrnateFrame().then((t) => {
+      if (active) setTex(t);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+  return tex;
+}
+
 /** 纯色 fallback 面板（imageUrl 为空或加载失败时） */
 function DoorPanelPlain({ color }: { color: string }) {
   return (
@@ -195,6 +248,7 @@ export function DreamDoor({
 }: DreamDoorProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
+  const ornate = useOrnateFrame();
   const emotionColor =
     getEmotionByWord(dream.emotion.word)?.color ?? "#c9b8e8";
   const imageUrl = dream.artifact.imageUrl;
@@ -224,7 +278,7 @@ export function DreamDoor({
     const dt = Math.min(delta, 0.05);
     // 注目度：距离 2 以内满格，5.5 之外归零；hover/聚焦时恒为 1
     const dz = Math.abs(state.camera.position.z - position[2]);
-    const near = THREE.MathUtils.clamp(1 - (dz - 2) / 3.5, 0, 1);
+    const near = THREE.MathUtils.clamp(1 - (dz - 2.8) / 4.2, 0, 1);
     const attention = Math.max(near * 0.85, lit ? 1 : 0);
 
     const target = 1 + attention * 0.02 + (lit ? 0.04 : 0);
@@ -280,11 +334,15 @@ export function DreamDoor({
           emissiveIntensity={0.06}
         />
       </mesh>
-      {/* 真实鎏金画框（Belle Époque 油画配厚金框，不配卡纸）：
-          四根有厚度的框条，凸出于画面之前——
-          之前的细平面金边远看只剩亚像素细线，必然锯齿闪烁；
-          有体积的框条有明暗面、多像素宽，稳定且有分量 */}
-      <group position={[0, 0, 0.05]}>
+      {/* 真实雕花鎏金画框（gpt-image 实物级）：内窗已抠透明，画作从窗中透出 */}
+      {ornate && (
+        <mesh position={[0, 0, 0.06]}>
+          <planeGeometry args={[DOOR_W + 0.62, DOOR_H + 0.66]} />
+          <meshBasicMaterial map={ornate} transparent depthWrite={false} />
+        </mesh>
+      )}
+      {/* 回退金框条（雕花图缺失时） */}
+      <group position={[0, 0, 0.05]} visible={!ornate}>
         {[
           { pos: [0, DOOR_H / 2 + 0.11, 0] as const, size: [DOOR_W + 0.44, 0.22, 0.07] as const },
           { pos: [0, -(DOOR_H / 2 + 0.11), 0] as const, size: [DOOR_W + 0.44, 0.22, 0.07] as const },

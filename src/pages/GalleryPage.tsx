@@ -149,6 +149,10 @@ export default function GalleryPage() {
       setStop((s) => Math.max(0, Math.min(maxStop, s + dir)));
     };
     const onWheel = (e: WheelEvent) => advance(e.deltaY > 0 ? 1 : -1);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowDown" || e.key === "ArrowRight" || e.key === "PageDown") advance(1);
+      else if (e.key === "ArrowUp" || e.key === "ArrowLeft" || e.key === "PageUp") advance(-1);
+    };
     let touchY = 0;
     const onTouchStart = (e: TouchEvent) => { touchY = e.touches[0]?.clientY ?? 0; };
     const onTouchEnd = (e: TouchEvent) => {
@@ -156,10 +160,12 @@ export default function GalleryPage() {
       if (Math.abs(dy) > 40) advance(dy > 0 ? 1 : -1);
     };
     window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("keydown", onKey);
     window.addEventListener("touchstart", onTouchStart, { passive: true });
     window.addEventListener("touchend", onTouchEnd, { passive: true });
     return () => {
       window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("keydown", onKey);
       window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchend", onTouchEnd);
     };
@@ -170,7 +176,9 @@ export default function GalleryPage() {
     if (mode !== "3d" || recentCount === 0) return;
     const startZ = 4;
     const endZ = -(recentCount - 1) * 4 - 4;
-    const zi = stop >= recentCount ? endZ : -stop * 4 + 2.4;
+    // 驻足点在画前 4.2：2.4 时门在视野边缘被裁切（水平半视角 ~37.5°，
+    // 门中心偏轴 51°）——4.2 恰好整幅画入镜，也与入场初始视角一致（可退回原点）
+    const zi = stop >= recentCount ? endZ : -stop * 4 + 4.2;
     scrollRef.current = (zi - startZ) / (endZ - startZ);
   }, [stop, mode, recentCount]);
 

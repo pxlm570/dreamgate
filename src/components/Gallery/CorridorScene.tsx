@@ -141,7 +141,7 @@ function CorridorDust({ length, color, texture }: { length: number; color: strin
 }
 
 /** 走廊墙壁：地板（MeshReflectorMaterial 反射）+ 天花板 + 左右墙 + 远端封口 + 尽头光源 */
-function CorridorWalls({ length, accentColor, glowTex, endMist, wallPanel, floorBase }: { length: number; accentColor: string; glowTex: THREE.Texture; endMist: THREE.Texture | null; wallPanel: THREE.Texture | null; floorBase: THREE.Texture | null }) {
+function CorridorWalls({ length, accentColor, glowTex, endMist, wallPanel, floorBase, ceilBase }: { length: number; accentColor: string; glowTex: THREE.Texture; endMist: THREE.Texture | null; wallPanel: THREE.Texture | null; floorBase: THREE.Texture | null; ceilBase: THREE.Texture | null }) {
   // 墙体向尽头方向大幅延长：让走廊管道在雾中隐没，而非露出方形开口
   // （之前 +16 会在尽头露出背景色的方形截面——「字的背景像塑料板」的元凶）
   const wallLen = length + 90;
@@ -168,19 +168,31 @@ function CorridorWalls({ length, accentColor, glowTex, endMist, wallPanel, floor
       t.needsUpdate = true;
       return t;
     };
+    // 门要挂在嵌板中央（美术馆挂画逻辑），不能横跨两块板：
+    // 瓦片内两块嵌板中心在相位 0.25 / 0.75——把门位相位对到 0.25
     const rightPhase = ((((length + 66) / 8) % 1) + 1) % 1;
-    return { left: mk(0), right: mk(0.5 - rightPhase) };
+    return { left: mk(-0.25), right: mk(0.25 - rightPhase) };
   }, [wallPanel, wallLen, length]);
-  // 地板拼花：3×3 世界单位一瓦
+  // 地板拼花：4×4 世界单位一瓦（纹样放大到肉眼可读）
   const floorTex = useMemo(() => {
     if (!floorBase) return null;
     const t = floorBase.clone();
     t.wrapS = THREE.RepeatWrapping;
     t.wrapT = THREE.RepeatWrapping;
-    t.repeat.set(2, wallLen / 3);
+    t.repeat.set(1.5, wallLen / 4);
     t.needsUpdate = true;
     return t;
   }, [floorBase, wallLen]);
+  // 藻井天花：6×6 世界单位一瓦
+  const ceilTex = useMemo(() => {
+    if (!ceilBase) return null;
+    const t = ceilBase.clone();
+    t.wrapS = THREE.RepeatWrapping;
+    t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(1, wallLen / 6);
+    t.needsUpdate = true;
+    return t;
+  }, [ceilBase, wallLen]);
   return (
     <group>
       {/* 地板：拼花木地板（gpt-image）+ 克制的反射——
@@ -198,15 +210,30 @@ function CorridorWalls({ length, accentColor, glowTex, endMist, wallPanel, floor
           minDepthThreshold={0.4}
           maxDepthThreshold={1.2}
           map={floorTex ?? undefined}
+          emissiveMap={floorTex ?? undefined}
+          emissive={floorTex ? "#7d76a0" : "#000000"}
+          emissiveIntensity={floorTex ? 0.22 : 0}
           color={floorTex ? "#ffffff" : "#0c0b18"}
           metalness={floorTex ? 0.12 : 0.5}
           mirror={floorTex ? 0.12 : 0.4}
         />
       </mesh>
-      {/* 天花板：哑光深邃 */}
+      {/* 天花板：Belle Époque 藻井（gpt-image），缺图回退哑光深色 */}
       <mesh position={[0, CORRIDOR_HALF_HEIGHT, centerZ]} rotation={[Math.PI / 2, 0, 0]}>
         <planeGeometry args={[6, wallLen]} />
-        <meshStandardMaterial color="#0a0913" metalness={0.05} roughness={0.95} />
+        {ceilTex ? (
+          <meshStandardMaterial
+            map={ceilTex}
+            emissiveMap={ceilTex}
+            emissive="#6a6288"
+            emissiveIntensity={0.24}
+            color="#ffffff"
+            metalness={0.05}
+            roughness={0.95}
+          />
+        ) : (
+          <meshStandardMaterial color="#0a0913" metalness={0.05} roughness={0.95} />
+        )}
       </mesh>
       {/* 左墙：gpt-image 画的 Belle Époque 护墙板（烘焙光/线脚都在图里），
           缺图回退纵向光衰减渐变 */}
@@ -465,7 +492,7 @@ export function CorridorScene({
       : null;
   const accentColor =
     getEmotionByWord(recent[0]?.emotion.word ?? "")?.color ?? "#c9b8e8";
-  const fogColor = mixColor(FOG_BASE, accentColor, 0.09);
+  const fogColor = mixColor(FOG_BASE, accentColor, 0.06);
   const fogHex = `#${fogColor.getHexString()}`;
   // dpr 移动端降低，桌面端封顶 1.5
   const dpr: [number, number] =
@@ -477,6 +504,7 @@ export function CorridorScene({
   const wallPanel = useOptionalTexture("/textures/wall-panel.png");
   // 拼花木地板（gpt-image 油画质感）：反射材质的底图——纯色模糊反射=塑料感根因
   const floorTexBase = useOptionalTexture("/textures/floor-parquet.png");
+  const ceilTexBase = useOptionalTexture("/textures/ceiling-coffer.png");
 
   return (
     <Canvas
@@ -487,13 +515,13 @@ export function CorridorScene({
       onPointerMissed={() => onMissClick?.()}
     >
       <color attach="background" args={[fogHex]} />
-      {withShaderFog && <fogExp2 attach="fog" args={[fogHex, 0.05]} />}
+      {withShaderFog && <fogExp2 attach="fog" args={[fogHex, 0.038]} />}
       {/* 多层光源：环境 + 半球 + 顶光（情绪色）+ 辅光 */}
       <ambientLight intensity={0.42} />
       <hemisphereLight color={accentColor} groundColor={FOG_BASE} intensity={0.34} />
       <pointLight position={[0, 4, 2]} intensity={0.6} color={accentColor} distance={15} />
       <pointLight position={[0, -2, 4]} intensity={0.3} color="#c9b8e8" distance={10} />
-      <CorridorWalls length={length} accentColor={accentColor} glowTex={glowTex} endMist={endMist} wallPanel={wallPanel} floorBase={floorTexBase} />
+      <CorridorWalls length={length} accentColor={accentColor} glowTex={glowTex} endMist={endMist} wallPanel={wallPanel} floorBase={floorTexBase} ceilBase={ceilTexBase} />
       <CameraRig scrollRef={scrollRef} length={length} reduceMotion={reduceMotion} focusTarget={focusTarget} diving={diving} />
       {!reduceMotion && <CorridorDust length={length} color={accentColor} texture={glowTex} />}
       {!reduceMotion && <FpsSampler onLow={onLowPerformance} />}

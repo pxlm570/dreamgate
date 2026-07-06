@@ -454,6 +454,12 @@ function MirrorAndCamera({
   const groupRef = useRef<THREE.Group>(null);
   const lookYRef = useRef(0);
   const { camera } = useThree();
+  // 镜面用独立克隆贴图：呼吸动画改 offset/repeat，不能影响画界与碎片共享的原图
+  const mirrorMap = useMemo(() => {
+    const t = nebula.clone();
+    t.needsUpdate = true;
+    return t;
+  }, [nebula]);
 
   // idle 阶段：视差全部交给相机环绕漂移；镜面不再自转
   // （镜面倾斜会与固定镜框/发光缘产生相对错动，正是「黑色部分随鼠标变形」的来源）
@@ -465,6 +471,19 @@ function MirrorAndCamera({
       // 分幕运镜（kimi 式）：幕0 远景舞台全貌，幕1 推近镜面；
       // 慢速 lerp 本身即 ~2s 的电影转场，叠加李萨如漂移保持画面恒动
       const t = state.clock.elapsedTime;
+      // 镜中世界的呼吸：贴图缓慢推近/漂移——镜面不是一张贴死的画，
+      // 而是一扇望进去还在流动的窗（镜子的想象空间所在）
+      if (mirrorRef.current) {
+        const mat = mirrorRef.current.material as THREE.MeshBasicMaterial;
+        if (mat.map) {
+          const s = 0.93 + Math.sin(t * 0.06) * 0.025;
+          mat.map.repeat.set(s, s);
+          mat.map.offset.set(
+            (1 - s) / 2 + Math.sin(t * 0.11) * 0.006,
+            (1 - s) / 2 + Math.cos(t * 0.08) * 0.005,
+          );
+        }
+      }
       // 幕1 拉远一点 + 视线下移：镜面在画面里上移收小，底部文案区不再压住镜面
       const baseZ = act === 0 ? 8.8 : 5.7;
       const ax = act === 0 ? 0.8 : 0.42;
@@ -538,7 +557,7 @@ function MirrorAndCamera({
       {/* 镜面 = 望进梦境的星云传送门（黑镜的黑色四边形随视差歪斜会显得别扭） */}
       <mesh ref={mirrorRef} position={[0, 0, 0]}>
         <planeGeometry args={[2, 3]} />
-        <meshBasicMaterial map={nebula} />
+        <meshBasicMaterial map={mirrorMap} />
       </mesh>
       {/* 「画界」：碎镜后在镜框原位显影的梦境图（与镜面同尺寸同位置），
           随后自框中向观者生长直至吞没画面——画框始终被画覆盖，无分离穿帮。
@@ -606,8 +625,8 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
       {/* 体积光瀑：光从上方倾泻在镜上（美术馆聚光的电影语言） */}
       <LightShaft texture={shaft} />
       {/* 反射地板：镜子立于其上，倒影是最强的空间锚点 */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.72, 0]}>
-        <planeGeometry args={[34, 24]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.72, -5]}>
+        <planeGeometry args={[34, 34]} />
         <MeshReflectorMaterial
           blur={[220, 60]}
           resolution={512}
