@@ -38,6 +38,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const TEXTURES = [
   {
+    name: "wall-panel",
+    size: "1536x1024",
+    prompt:
+      "seamless tileable texture of a dark Belle Epoque art gallery wall with classical recessed panel moulding, two tall elegant rectangular panels side by side, very dark charcoal-violet painted wood panelling, painterly oil texture with subtle visible brushwork, soft baked ambient lighting from above, faint warm highlights catching the moulding edges, near-black overall, muted, quiet, refined, no objects, no frames, no text, flat frontal view, texture only",
+  },
+  {
     name: "gate-backdrop",
     size: "1536x1024",
     prompt:

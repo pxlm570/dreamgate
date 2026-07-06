@@ -141,7 +141,7 @@ function CorridorDust({ length, color, texture }: { length: number; color: strin
 }
 
 /** 走廊墙壁：地板（MeshReflectorMaterial 反射）+ 天花板 + 左右墙 + 远端封口 + 尽头光源 */
-function CorridorWalls({ length, accentColor, glowTex, endMist }: { length: number; accentColor: string; glowTex: THREE.Texture; endMist: THREE.Texture | null }) {
+function CorridorWalls({ length, accentColor, glowTex, endMist, wallPanel }: { length: number; accentColor: string; glowTex: THREE.Texture; endMist: THREE.Texture | null; wallPanel: THREE.Texture | null }) {
   // 墙体向尽头方向大幅延长：让走廊管道在雾中隐没，而非露出方形开口
   // （之前 +16 会在尽头露出背景色的方形截面——「字的背景像塑料板」的元凶）
   const wallLen = length + 90;
@@ -160,7 +160,7 @@ function CorridorWalls({ length, accentColor, glowTex, endMist }: { length: numb
         <planeGeometry args={[6, wallLen]} />
         <MeshReflectorMaterial
           blur={[300, 80]}
-          resolution={512}
+          resolution={384}
           mixBlur={1}
           mixStrength={20}
           roughness={0.85}
@@ -177,34 +177,36 @@ function CorridorWalls({ length, accentColor, glowTex, endMist }: { length: numb
         <planeGeometry args={[6, wallLen]} />
         <meshStandardMaterial color="#0a0913" metalness={0.05} roughness={0.95} />
       </mesh>
-      {/* 左墙：纵向光衰减（墙脚微亮）打掉平板黑墙感 */}
+      {/* 左墙：gpt-image 画的 Belle Époque 护墙板（烘焙光/线脚都在图里），
+          缺图回退纵向光衰减渐变 */}
       <mesh position={[-DOOR_OFFSET_X, 0, centerZ]} rotation={[0, Math.PI / 2, 0]}>
         <planeGeometry args={[wallLen, 6]} />
-        <meshStandardMaterial map={wallGrad} color="#ffffff" metalness={0.06} roughness={0.9} />
+        <meshStandardMaterial
+          map={wallPanel ?? wallGrad}
+          emissiveMap={wallPanel ?? wallGrad}
+          emissive="#9c92c0"
+          emissiveIntensity={0.34}
+          color="#ffffff"
+          metalness={0.06}
+          roughness={0.9}
+        />
       </mesh>
       {/* 右墙 */}
       <mesh position={[DOOR_OFFSET_X, 0, centerZ]} rotation={[0, -Math.PI / 2, 0]}>
         <planeGeometry args={[wallLen, 6]} />
-        <meshStandardMaterial map={wallGrad} color="#ffffff" metalness={0.06} roughness={0.9} />
+        <meshStandardMaterial
+          map={wallPanel ?? wallGrad}
+          emissiveMap={wallPanel ?? wallGrad}
+          emissive="#9c92c0"
+          emissiveIntensity={0.34}
+          color="#ffffff"
+          metalness={0.06}
+          roughness={0.9}
+        />
       </mesh>
-      {/* 壁柱：每两幅画之间一根竖向浅浮雕柱——长墙被切分出间律，
-          墙不再是无限延伸的平板（真实美术馆的展墙分隔语言） */}
-      {Array.from({ length: Math.max(Math.floor(length / 4) + 2, 2) }, (_, i) => {
-        const z = 2 - i * 4;
-        return (
-          <group key={`pil-${i}`}>
-            <mesh position={[-DOOR_OFFSET_X + 0.05, 0, z]}>
-              <boxGeometry args={[0.1, 6, 0.44]} />
-              <meshStandardMaterial color="#13111f" metalness={0.3} roughness={0.7} />
-            </mesh>
-            <mesh position={[DOOR_OFFSET_X - 0.05, 0, z]}>
-              <boxGeometry args={[0.1, 6, 0.44]} />
-              <meshStandardMaterial color="#13111f" metalness={0.3} roughness={0.7} />
-            </mesh>
-          </group>
-        );
-      })}
-      {/* —— 建筑线索：踢脚线 + 天花灯带（透视消失线 = 室内空间感的骨架）—— */}
+      {/* —— 建筑线索：踢脚线 + 天花灯带（透视消失线 = 室内空间感的骨架）——
+          墙面的护墙板线脚不用几何拼（几根棍子毫无美感），
+          由 gpt-image 画进墙面贴图（wall-panel.png，烘焙光思路） */}
       {/* 左右踢脚线：墙脚微光勾边 */}
       <mesh position={[-DOOR_OFFSET_X + 0.02, -CORRIDOR_HALF_HEIGHT + 0.07, centerZ]}>
         <boxGeometry args={[0.03, 0.14, wallLen]} />
@@ -439,6 +441,8 @@ export function CorridorScene({
   const glowTex = useMemo(makeGlowTexture, []);
   // 尽头迷雾真图（gpt-image）：缺图回退程序化径向柔光
   const endMist = useOptionalTexture("/textures/corridor-mist.png");
+  // 护墙板墙面（gpt-image 烘焙光）：每 8 个世界单位一个镜像瓦片
+  const wallPanel = useOptionalTexture("/textures/wall-panel.png", (length + 90) / 8, 1);
 
   return (
     <Canvas
@@ -455,7 +459,7 @@ export function CorridorScene({
       <hemisphereLight color={accentColor} groundColor={FOG_BASE} intensity={0.34} />
       <pointLight position={[0, 4, 2]} intensity={0.6} color={accentColor} distance={15} />
       <pointLight position={[0, -2, 4]} intensity={0.3} color="#c9b8e8" distance={10} />
-      <CorridorWalls length={length} accentColor={accentColor} glowTex={glowTex} endMist={endMist} />
+      <CorridorWalls length={length} accentColor={accentColor} glowTex={glowTex} endMist={endMist} wallPanel={wallPanel} />
       <CameraRig scrollRef={scrollRef} length={length} reduceMotion={reduceMotion} focusTarget={focusTarget} diving={diving} />
       {!reduceMotion && <CorridorDust length={length} color={accentColor} texture={glowTex} />}
       {!reduceMotion && <FpsSampler onLow={onLowPerformance} />}

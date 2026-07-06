@@ -291,17 +291,12 @@ export function DreamDoor({
           emissiveIntensity={lit ? 0.14 : 0.07}
         />
       </mesh>
-      {/* 鎏金内衬（Belle Époque 装裱语言，对标《光与影 33》画框质感）：
-          卡纸与画之间一圈窄金边，金属高反射在射灯下出微光 */}
+      {/* 鎏金内衬（Belle Époque 装裱语言）：哑光鎏金。
+          不能用高 metalness——无环境贴图的裸金属只剩点光镜面高光，
+          相机一动就镜面锯齿闪烁（sparkle）；basic 平色金 + Bloom 微光最稳 */}
       <mesh position={[0, 0, 0.0]}>
         <planeGeometry args={[DOOR_W + 0.1, DOOR_H + 0.1]} />
-        <meshStandardMaterial
-          color="#96793f"
-          metalness={0.92}
-          roughness={0.32}
-          emissive="#5c4718"
-          emissiveIntensity={0.25}
-        />
+        <meshBasicMaterial color="#89702f" />
       </mesh>
       {/* 射灯洗墙光：从画上方倾泻在墙上的暖白光斑（美术馆 track light 打在墙面） */}
       {glowTex && (
