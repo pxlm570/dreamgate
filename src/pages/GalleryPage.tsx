@@ -14,7 +14,7 @@ import { useDegradation, triggerDegradation } from "@/lib/degradation";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { getEmotionByWord } from "@/lib/emotions";
 import { Fog } from "@/components/Atmosphere";
-import { Button, Display, Caption } from "@/components/ui";
+import { Button, Display, Caption, EntranceVeil } from "@/components/ui";
 import { CorridorScene, ParallaxGallery, EmptyGallery, GalleryModeToggle, type GalleryMode } from "@/components/Gallery";
 import { loadSeeds, SEED_DREAMS } from "@/data/seedDreams";
 import type { Dream } from "@/lib/types";
@@ -216,9 +216,8 @@ export default function GalleryPage() {
     const focusSide = focusIdx >= 0 && focusIdx % 2 === 0 ? -1 : 1;
     return (
       <div className="relative bg-dreamgate-deep">
-        {/* 入场揭幕：深色幕布 1s 淡出，盖住 Canvas 初始化的生硬帧，
-            与镜之门末端暗场无缝衔接（纯 CSS + fill both，主线程拥塞也不丢帧） */}
-        <div aria-hidden className="pointer-events-none fixed inset-0 z-50 animate-veil-out bg-dreamgate-deep" />
+        {/* 入场揭幕：与镜之门末端暗场无缝衔接（组件内含 JS 定时卸载兜底） */}
+        <EntranceVeil />
         <div className="fixed inset-0 z-0">
           <CorridorScene
             dreams={dreams}

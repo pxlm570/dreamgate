@@ -452,6 +452,7 @@ function MirrorAndCamera({
   const mirrorRef = useRef<THREE.Mesh>(null);
   const portalRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
+  const lookYRef = useRef(0);
   const { camera, scene } = useThree();
 
   // idle 阶段：视差全部交给相机环绕漂移；镜面不再自转
@@ -464,9 +465,12 @@ function MirrorAndCamera({
       // 分幕运镜（kimi 式）：幕0 远景舞台全貌，幕1 推近镜面；
       // 慢速 lerp 本身即 ~2s 的电影转场，叠加李萨如漂移保持画面恒动
       const t = state.clock.elapsedTime;
-      const baseZ = act === 0 ? 8.8 : 5.2;
+      // 幕1 拉远一点 + 视线下移：镜面在画面里上移收小，底部文案区不再压住镜面
+      const baseZ = act === 0 ? 8.8 : 5.7;
       const ax = act === 0 ? 0.8 : 0.42;
       const ay = act === 0 ? 0.32 : 0.18;
+      const lookY = act === 0 ? 0 : -0.5;
+      lookYRef.current = THREE.MathUtils.lerp(lookYRef.current, lookY, 0.03);
       camera.position.z = THREE.MathUtils.lerp(
         camera.position.z,
         baseZ + Math.sin(t * 0.3) * 0.15,
@@ -482,7 +486,7 @@ function MirrorAndCamera({
         Math.cos(t * 0.09) * ay + py * 0.18,
         0.03,
       );
-      camera.lookAt(0, 0, 0);
+      camera.lookAt(0, lookYRef.current, 0);
     }
   });
 
@@ -615,11 +619,27 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
           depthScale={1}
           minDepthThreshold={0.4}
           maxDepthThreshold={1.2}
-          color="#070710"
+          color="#0f0d1e"
           metalness={0.45}
           mirror={0.55}
         />
       </mesh>
+      {/* 地平线雾霭：柔光横带糊掉「地板黑平板 vs 天幕」的生硬接缝——
+          远处地面应溶进空气里，而不是一条切线 */}
+      <GlowPlane
+        texture={glow}
+        position={[0, -1.35, -12.2]}
+        scale={[44, 4.6]}
+        color="#6a5c9e"
+        opacity={0.17}
+      />
+      <GlowPlane
+        texture={glow}
+        position={[0, -1.55, -11.8]}
+        scale={[62, 3]}
+        color="#4a3f78"
+        opacity={0.12}
+      />
       {/* 镜前地面光池：光瀑落地的光斑 */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.71, 0.9]} scale={[3.6, 2.2, 1]}>
         <planeGeometry args={[1, 1]} />

@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, RefreshCw } from "lucide-react";
-import { Backdrop, Display, Caption, Button } from "@/components/ui";
+import { Backdrop, Display, Caption, Button, EntranceVeil } from "@/components/ui";
 import { DreamImmersive, GenerationOrchestrator } from "@/components/Generation";
 import { ExportButton } from "@/components/Privacy";
 import { useDreamStore } from "@/store/useDreamStore";
@@ -110,7 +110,7 @@ export default function DreamRoomPage() {
   return (
     <div className="relative bg-dreamgate-deep">
       {/* 入场揭幕：从画廊入画的淡出无缝接到这里的淡入 */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-50 animate-veil-out bg-dreamgate-deep" />
+      <EntranceVeil />
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}

@@ -136,7 +136,9 @@ export default function GatePage() {
           }}
         />
       )}
-      {phase === "triggered" && (
+      {/* 末端暗场：注意条件是 phase!=="idle"——onComplete 置 done 后遮罩必须继续在场，
+          否则全黑刚盖住的瞬间被卸载，会闪回门的画面再跳转（转场生硬的元凶） */}
+      {phase !== "idle" && (
         <motion.div
           key="dive-end"
           className="pointer-events-none absolute inset-0 z-30 bg-dreamgate-deep"

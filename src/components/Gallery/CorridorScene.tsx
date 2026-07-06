@@ -48,6 +48,40 @@ function makeEndTextTexture(): { tex: THREE.CanvasTexture; aspect: number } {
   return { tex, aspect: w / h };
 }
 
+/**
+ * 墙面纵向光衰减贴图：墙脚（近光池/踢脚线）微亮、向上沉入暗部，带噪抖动。
+ * 纯色平面墙 = 平板黑墙；一条纵向明暗梯度就是最便宜的「光在墙上」。
+ */
+function makeWallGradTexture(): THREE.CanvasTexture {
+  const w = 64;
+  const h = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, "#0a0914"); // 顶部（贴图 v=1 在下……canvas y=0 对应 v=1 即墙顶）
+  g.addColorStop(0.62, "#100e1f");
+  g.addColorStop(1, "#161329"); // 墙脚微亮
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  const img = ctx.getImageData(0, 0, w, h);
+  const px = img.data;
+  for (let i = 0; i < px.length; i += 4) {
+    const n = (Math.random() - 0.5) * 7;
+    px[i] += n;
+    px[i + 1] += n;
+    px[i + 2] += n;
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.MirroredRepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 /** 径向柔光贴图（白核→透明），用于走廊尽头的柔和光晕焦点 */
 function makeGlowTexture(): THREE.CanvasTexture {
   const size = 256;
@@ -113,6 +147,12 @@ function CorridorWalls({ length, accentColor, glowTex, endMist }: { length: numb
   const wallLen = length + 90;
   const centerZ = -length / 2 - 25;
   const endText = useMemo(makeEndTextTexture, []);
+  // 墙面光衰减贴图：沿墙长镜像平铺（避免噪点被拉成横向条纹）
+  const wallGrad = useMemo(() => {
+    const t = makeWallGradTexture();
+    t.repeat.set(Math.max(wallLen / 8, 1), 1);
+    return t;
+  }, [wallLen]);
   return (
     <group>
       {/* 地板：深色反射地面（光池/画作倒影承担空间感） */}
@@ -137,15 +177,15 @@ function CorridorWalls({ length, accentColor, glowTex, endMist }: { length: numb
         <planeGeometry args={[6, wallLen]} />
         <meshStandardMaterial color="#0a0913" metalness={0.05} roughness={0.95} />
       </mesh>
-      {/* 左墙：哑光深邃 */}
+      {/* 左墙：纵向光衰减（墙脚微亮）打掉平板黑墙感 */}
       <mesh position={[-DOOR_OFFSET_X, 0, centerZ]} rotation={[0, Math.PI / 2, 0]}>
         <planeGeometry args={[wallLen, 6]} />
-        <meshStandardMaterial color="#0c0b17" metalness={0.06} roughness={0.9} />
+        <meshStandardMaterial map={wallGrad} color="#ffffff" metalness={0.06} roughness={0.9} />
       </mesh>
       {/* 右墙 */}
       <mesh position={[DOOR_OFFSET_X, 0, centerZ]} rotation={[0, -Math.PI / 2, 0]}>
         <planeGeometry args={[wallLen, 6]} />
-        <meshStandardMaterial color="#0c0b17" metalness={0.06} roughness={0.9} />
+        <meshStandardMaterial map={wallGrad} color="#ffffff" metalness={0.06} roughness={0.9} />
       </mesh>
       {/* —— 建筑线索：踢脚线 + 天花灯带（透视消失线 = 室内空间感的骨架）—— */}
       {/* 左右踢脚线：墙脚微光勾边 */}
@@ -166,19 +206,19 @@ function CorridorWalls({ length, accentColor, glowTex, endMist }: { length: numb
       {/* 尽头引导光源：远处微光 */}
       <pointLight
         position={[0, 0, -length - 5]}
-        intensity={2.2}
+        intensity={1.2}
         color={accentColor}
-        distance={16}
+        distance={12}
         decay={2}
       />
       {/* 光之隧道：柔光在不同深度递减层叠——单块大光晕会读成「一面发光的墙」，
           多层递减才是「光通向更远处」 */}
       {/* 远三层用 gpt-image 迷雾真图（有云絮形状的光才不像亮片），近一层保留情绪色柔光 */}
+      {/* 意犹未尽 = 黑暗向深处延续 + 远方一点微光，不是一面亮雾墙——层数收敛、贴脸层删除 */}
       {[
-        { z: -length - 6, s: 4.5, o: 0.38, mist: false },
-        { z: -length - 11, s: 8, o: 0.3, mist: true },
-        { z: -length - 18, s: 13, o: 0.2, mist: true },
-        { z: -length - 27, s: 20, o: 0.12, mist: true },
+        { z: -length - 6, s: 4.5, o: 0.22, mist: false },
+        { z: -length - 13, s: 6.5, o: 0.12, mist: true },
+        { z: -length - 22, s: 10, o: 0.06, mist: true },
       ].map((g, i) => (
         <mesh key={i} position={[0, 0, g.z]} scale={[g.s, g.s, 1]}>
           <planeGeometry args={[1, 1]} />
@@ -193,9 +233,11 @@ function CorridorWalls({ length, accentColor, glowTex, endMist }: { length: numb
         </mesh>
       ))}
       {/* 幽灵门：尽头之外墙上若隐若现的空门框——尚未成形的梦境，越远越淡 */}
+      {/* 幽灵门推到相机停点更远处（-length-4 就是相机终点，贴脸会成大灰板），
+          且压得极淡——只该是雾中一丝「似乎还有门」的暗示 */}
       {[0, 1, 2, 3].map((i) => {
         const side = i % 2 === 0 ? -1 : 1;
-        const z = -length - 4 - i * 3.4;
+        const z = -length - 8 - i * 3.4;
         return (
           <mesh
             key={`ghost-${i}`}
@@ -206,7 +248,7 @@ function CorridorWalls({ length, accentColor, glowTex, endMist }: { length: numb
             <meshBasicMaterial
               color={accentColor}
               transparent
-              opacity={0.11 - i * 0.022}
+              opacity={0.032 - i * 0.006}
               blending={THREE.AdditiveBlending}
               depthWrite={false}
             />
@@ -363,7 +405,7 @@ export function CorridorScene({
       : null;
   const accentColor =
     getEmotionByWord(recent[0]?.emotion.word ?? "")?.color ?? "#c9b8e8";
-  const fogColor = mixColor(FOG_BASE, accentColor, 0.16);
+  const fogColor = mixColor(FOG_BASE, accentColor, 0.09);
   const fogHex = `#${fogColor.getHexString()}`;
   // dpr 移动端降低，桌面端封顶 1.5
   const dpr: [number, number] =
