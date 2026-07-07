@@ -28,14 +28,14 @@ export function EntranceVeil() {
 export function MatchCutReveal({ src = "/textures/mirror-dream.png" }: { src?: string }) {
   const [gone, setGone] = useState(false);
   useEffect(() => {
-    const t = window.setTimeout(() => setGone(true), 2300);
+    const t = window.setTimeout(() => setGone(true), 2700);
     return () => window.clearTimeout(t);
   }, []);
   if (gone) return null;
   return (
     <div
       aria-hidden
-      className="animate-[veil-out_1.5s_ease-out_0.45s_both] pointer-events-none fixed inset-0 z-50 overflow-hidden bg-dreamgate-deep"
+      className="animate-[veil-out_1.6s_ease-out_0.75s_both] pointer-events-none fixed inset-0 z-50 overflow-hidden bg-dreamgate-deep"
     >
       <img src={src} alt="" className="animate-match-zoom h-full w-full object-cover" />
     </div>

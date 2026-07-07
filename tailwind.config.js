@@ -53,7 +53,7 @@ export default {
         // 页面入场揭幕：深色幕布淡出（纯 CSS + fill both，3D 初始化抢主线程也不丢帧）
         "veil-out": "veil-out 1s ease-out 0.15s both",
         // 匹配剪辑揭幕：门的末帧与画廊首帧是同一张图，图缓推 + 容器淡出
-        "match-zoom": "match-zoom 1.9s cubic-bezier(0.22,1,0.36,1) both",
+        "match-zoom": "match-zoom 2.6s cubic-bezier(0.25,0.6,0.4,1) both",
       },
       keyframes: {
         float: {
@@ -78,7 +78,7 @@ export default {
         },
         "match-zoom": {
           from: { transform: "scale(1)" },
-          to: { transform: "scale(1.12)" },
+          to: { transform: "scale(1.07)" },
         },
         "gate-rise": {
           from: { opacity: "0", transform: "translateY(34px)", filter: "blur(10px)" },

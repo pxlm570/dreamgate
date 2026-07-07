@@ -41,7 +41,7 @@ const TEXTURES = [
     name: "mirror-frame",
     size: "1024x1536",
     prompt:
-      "tall minimalist standing mirror frame, slim straight profile, dark aged bronze with subtle patina and a faint violet sheen, clean simple lines, no carving, no ornament, no crest, complete frame shown in full, rectangular opening, the frame border occupies about 9 percent of the image width on each side, portrait orientation, photographed perfectly straight-on and centered, the opening inside the frame is pure solid black, the background outside the frame is pure solid black, no glass, no reflection, no text",
+      "elegant antique standing mirror frame, weathered dark bronze with delicate refined engraved detailing along the moulding, moderately ornamented — graceful, not baroque, gentle pediment top, soft moonlit violet rim light catching the frame edges as if lit by a night sky, matte painterly finish consistent with a dark violet cloudscape matte painting, complete frame shown in full, rectangular opening, portrait orientation, photographed perfectly straight-on and centered, the opening inside the frame is pure solid black, the background outside the frame is pure solid black, no glass, no text",
   },
   {
     name: "mirror-dream",

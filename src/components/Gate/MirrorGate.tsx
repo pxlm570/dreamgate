@@ -340,20 +340,20 @@ function Shards({ triggered, nebula }: { triggered: boolean; nebula: THREE.Textu
       mat.opacity = 1;
       tl.to(
         m.position,
-        { x: d.target[0], y: d.target[1], z: d.target[2], duration: 1.8, ease: "power3.out" },
+        { x: d.target[0], y: d.target[1], z: d.target[2], duration: 1.1, ease: "power3.out" },
         0,
       );
       tl.to(
         m.rotation,
-        { x: d.rot[0], y: d.rot[1], z: d.rot[2], duration: 1.8, ease: "power2.out" },
+        { x: d.rot[0], y: d.rot[1], z: d.rot[2], duration: 1.1, ease: "power2.out" },
         0,
       );
       tl.to(
         m.scale,
-        { x: d.scale, y: d.scale, z: d.scale, duration: 1.8, ease: "power2.out" },
+        { x: d.scale, y: d.scale, z: d.scale, duration: 1.1, ease: "power2.out" },
         0,
       );
-      tl.to(mat, { opacity: 0, duration: 1.4, ease: "power2.in" }, 0.25);
+      tl.to(mat, { opacity: 0, duration: 0.85, ease: "power2.in" }, 0.2);
     });
     return () => {
       tl.kill();
@@ -455,37 +455,32 @@ function MirrorAndCamera({
   useEffect(() => {
     if (!triggering) return;
     const tl = gsap.timeline();
-    // 时序三拍（画从框中生长，相机几乎不动）：
-    //   第1拍 0~0.55s   碎裂——镜面消失、碎片起飞、白闪
-    //   第2拍 0.5s~     显影——「画界」在镜框原位浮现（与镜面同尺寸同位置）
-    //   第3拍 0.5~2.3s  吞没——画自框中向观者生长，直到充满整个画面。
-    //   相机只轻微前倾。之前的方案是相机加速穿过门框飞行：门框从身边
-    //   掠过=「门框和画分离」的穿帮 + 近平面裁剪的突兀感，已废弃。
+    // 严格顺序三拍（拍与拍零重叠——重叠正是「上一个动画没播完
+    // 下一个已开始」的粗糙感来源）：
+    //   第1拍 0~0.95s    碎裂完整谢幕：镜面缩没、碎片飞散并全部淡尽、白闪结束
+    //   第2拍 0.95~2.25s 显影+吞没：画界浮现并自框中生长满屏，相机轻推
+    //   第3拍 2.25~2.6s  静止帧：满屏画面完全静止，路由切换的冻结藏在这里
     if (mirrorRef.current) {
-      tl.to(
-        mirrorRef.current.scale,
-        { x: 0, y: 0, duration: 0.25, ease: "power3.in" },
-        0,
-      );
+      // 瞬时隐去：碎片与镜面同位同图，接管是无缝的——
+      // 「镜面缩小消失」动画本身就是"上一个画面没结束"的观感来源
+      tl.set(mirrorRef.current, { visible: false }, 0.06);
     }
     if (portalRef.current) {
       const pm = portalRef.current.material as THREE.MeshBasicMaterial;
       pm.opacity = 0;
-      tl.to(pm, { opacity: 1, duration: 0.7, ease: "power2.out" }, 0.5);
-      // 均匀放大到覆盖全屏后提前收尾：末端 ~0.3s 是静止帧——
-      // 路由切换的主线程冻结落在静止画面上，肉眼不可见（静止剪辑）
+      tl.to(pm, { opacity: 1, duration: 0.45, ease: "power2.out" }, 0.95);
       tl.to(
         portalRef.current.scale,
-        { x: 3.2, y: 3.2, duration: 1.5, ease: "power2.inOut" },
-        0.5,
+        { x: 3.2, y: 3.2, duration: 1.3, ease: "power2.inOut" },
+        0.95,
       );
     }
     tl.to(
       camera.position,
-      { z: 4.3, duration: 1.5, ease: "power1.inOut", delay: 0.5 },
+      { z: 4.3, duration: 1.3, ease: "power1.inOut", delay: 0.95 },
       0,
     );
-    tl.call(onComplete, [], 2.3);
+    tl.call(onComplete, [], 2.6);
     return () => {
       tl.kill();
     };
@@ -516,8 +511,9 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
   const nebula = useMemo(makeNebulaTexture, []);
   const backdropCanvas = useMemo(makeBackdropTexture, []);
   // 定稿A「镜湖」素材（全部缺图回退现有画法）
-  // 简约直边立镜：实测开口 x 0.22~0.78 / y 0.085~0.915（含图幅黑边）
-  const mirrorFrameTex = usePunchedFrame("/textures/mirror-frame.png", 0.23, 0.09);
+  // 优雅立镜（做旧暗铜+紫边缘光）：浏览器逐像素实测开口
+  // x 0.264 / 上 0.204（山墙顶）/ 下 0.160，抠窗略缩留框唇
+  const mirrorFrameTex = usePunchedFrame("/textures/mirror-frame.png", 0.267, 0.207, 0.163);
   const cloudTex = useOptionalTexture("/textures/cloud-bank.png");
   // 天幕真图：gpt-image matte painting（程序化色晕画不出空气感），缺图回退 canvas 版
   const backdropImg = useOptionalTexture("/textures/gate-backdrop.png");
@@ -611,17 +607,17 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
       </mesh>
       {mirrorFrameTex ? (
         <group position={[0, 0, -0.06]}>
-          {/* 定稿A：雕花立镜框（gpt-image 实物级，内窗抠透明对齐镜面） */}
-          {/* 窗=2×3 对齐镜心；镜面 2.4×3.6 超填于后，杜绝露缝；
-              黑边余量已被键控成透明，不占画面 */}
-          {/* z=0.1（组内）→ 世界 0.04：必须在镜面(0)之前，框带才能压住超填的镜缘；
+          {/* 优雅立镜框：窗=2×3 对齐镜心（窗心比图心低 0.022 → 面片上移补偿）；
+              镜面 2.4×3.3 超填于后，框带世界宽 ~0.5 全覆盖，杜绝露缝。
+              z=0.1（组内）→ 世界 0.04：必须在镜面(0)之前，框带才能压住超填镜缘；
               画界在 0.12 更前，吞没时盖框 ✓ */}
-          <mesh position={[0, 0, 0.1]}>
-            <planeGeometry args={[2 / 0.54, 3 / 0.83]} />
+          <mesh position={[0, 0.1, 0.1]}>
+            <planeGeometry args={[2 / 0.472, 3 / 0.636]} />
             <meshBasicMaterial map={mirrorFrameTex} transparent depthWrite={false} />
           </mesh>
-          <GlowPlane texture={glow} position={[0, 0, -0.02]} scale={[3.4, 4.4]} color={ACCENT_3} opacity={0.26} />
-          <GlowPlane texture={glow} position={[0, 0, -0.04]} scale={[5.2, 6.2]} color={ACCENT} opacity={0.12} />
+          {/* 辉光压暗：镜面隐去后这两层不能裸露成一块淡紫平板 */}
+          <GlowPlane texture={glow} position={[0, 0, -0.02]} scale={[3.4, 4.4]} color={ACCENT_3} opacity={0.12} />
+          <GlowPlane texture={glow} position={[0, 0, -0.04]} scale={[5.2, 6.2]} color={ACCENT} opacity={0.06} />
         </group>
       ) : (
         <MirrorFrame glow={glow} />
