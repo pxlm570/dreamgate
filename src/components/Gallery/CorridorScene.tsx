@@ -466,7 +466,12 @@ export interface CorridorSceneProps {
   onMissClick?: () => void;
 }
 
-export function CorridorScene({
+/**
+ * CorridorWorld — 走廊场景内容（不含 Canvas 壳）。
+ * 融合单世界 Step1 提取：可作为独立页 Canvas 的孩子（CorridorScene），
+ * 也可挂进未来的单世界 World Canvas 与镜之门共存。
+ */
+export function CorridorWorld({
   dreams,
   onDoorClick,
   scrollRef,
@@ -475,8 +480,7 @@ export function CorridorScene({
   onLowPerformance,
   focusedId,
   diving = false,
-  onMissClick,
-}: CorridorSceneProps) {
+}: Omit<CorridorSceneProps, "onMissClick">) {
   // 最近 20 条，最新在前（走廊入口先看到最新梦境）
   const recent = dreams.slice(-20).reverse();
   const length = Math.max(recent.length - 1, 0) * DOOR_SPACING;
@@ -494,9 +498,6 @@ export function CorridorScene({
     getEmotionByWord(recent[0]?.emotion.word ?? "")?.color ?? "#c9b8e8";
   const fogColor = mixColor(FOG_BASE, accentColor, 0.06);
   const fogHex = `#${fogColor.getHexString()}`;
-  // dpr 移动端降低，桌面端封顶 1.5
-  const dpr: [number, number] =
-    typeof window !== "undefined" && window.innerWidth < 768 ? [1, 1.2] : [1, 1.5];
   const glowTex = useMemo(makeGlowTexture, []);
   // 尽头迷雾真图（gpt-image）：缺图回退程序化径向柔光
   const endMist = useOptionalTexture("/textures/corridor-mist.png");
@@ -507,13 +508,7 @@ export function CorridorScene({
   const ceilTexBase = useOptionalTexture("/textures/ceiling-coffer.png");
 
   return (
-    <Canvas
-      camera={{ position: [0, 0, 4], fov: 55 }}
-      dpr={dpr}
-      gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
-      style={{ position: "absolute", inset: 0 }}
-      onPointerMissed={() => onMissClick?.()}
-    >
+    <>
       <color attach="background" args={[fogHex]} />
       {withShaderFog && <fogExp2 attach="fog" args={[fogHex, 0.038]} />}
       {/* 多层光源：环境 + 半球 + 顶光（情绪色）+ 辅光 */}
@@ -555,6 +550,24 @@ export function CorridorScene({
         {/* 暗角减弱：过重的暗角把走廊四周压成漆黑，吃掉建筑线条的留白层次 */}
         <Vignette eskil={false} offset={0.16} darkness={0.62} />
       </EffectComposer>
+    </>
+  );
+}
+
+/** 独立页面用的 Canvas 壳（GalleryPage 现行挂载方式）；场景内容在 CorridorWorld */
+export function CorridorScene({ onMissClick, ...worldProps }: CorridorSceneProps) {
+  // dpr 移动端降低，桌面端封顶 1.5
+  const dpr: [number, number] =
+    typeof window !== "undefined" && window.innerWidth < 768 ? [1, 1.2] : [1, 1.5];
+  return (
+    <Canvas
+      camera={{ position: [0, 0, 4], fov: 55 }}
+      dpr={dpr}
+      gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
+      style={{ position: "absolute", inset: 0 }}
+      onPointerMissed={() => onMissClick?.()}
+    >
+      <CorridorWorld {...worldProps} />
     </Canvas>
   );
 }

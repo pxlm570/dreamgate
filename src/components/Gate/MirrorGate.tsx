@@ -569,7 +569,14 @@ function MirrorAndCamera({
   );
 }
 
-export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps) {
+/**
+ * GateScene — 镜之门场景内容（不含 Canvas 壳）。
+ * 融合单世界 Step1 提取：可作为独立页 Canvas 的孩子（MirrorGate），
+ * 也可挂进未来的单世界 World Canvas 与走廊共存。
+ * 注：<color>/<fogExp2> attach 到父级 scene——单世界模式下由 World 统一接管氛围时，
+ * 应由外层决定是否渲染（Step2 处理）。
+ */
+export function GateScene({ triggering, onComplete, act = 1 }: MirrorGateProps) {
   const glow = useMemo(makeGlowTexture, []);
   const nebula = useMemo(makeNebulaTexture, []);
   const backdropCanvas = useMemo(makeBackdropTexture, []);
@@ -591,12 +598,7 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
   const dreamTex = useOptionalTexture("/textures/mirror-dream.png");
   const mirrorTex = dreamTex ?? nebula;
   return (
-    <Canvas
-      camera={{ position: [0, 0, 6], fov: 50 }}
-      dpr={[1, 1.5]}
-      gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
-      style={{ position: "absolute", inset: 0 }}
-    >
+    <>
       <color attach="background" args={[FOG_COLOR]} />
       <fogExp2 attach="fog" args={[FOG_COLOR, 0.055]} />
       {/* 光源：环境光 + 半球光 + 顶光（紫白）+ 侧光（青绿）+ 辅光（紫罗兰） */}
@@ -719,6 +721,20 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
         {/* 暗角减弱：0.88 会把四周压成漆黑，吃掉留白层次 */}
         <Vignette eskil={false} offset={0.12} darkness={0.7} />
       </EffectComposer>
+    </>
+  );
+}
+
+/** 独立页面用的 Canvas 壳（GatePage 现行挂载方式）；场景内容在 GateScene */
+export function MirrorGate(props: MirrorGateProps) {
+  return (
+    <Canvas
+      camera={{ position: [0, 0, 6], fov: 50 }}
+      dpr={[1, 1.5]}
+      gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
+      style={{ position: "absolute", inset: 0 }}
+    >
+      <GateScene {...props} />
     </Canvas>
   );
 }
