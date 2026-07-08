@@ -18,6 +18,55 @@ const ACCENT = "#c9b8e8";
 const ACCENT_2 = "#4ec9b0";
 const ACCENT_3 = "#8b5cf6"; // 紫罗兰辉光辅色
 
+/**
+ * 拱门框贴图开口实测值（PowerShell 逐像素，System.Drawing，1024×1536）：
+ * 直边内缘 fx=0.219（左右对称）；拱顶内缘 fyApex=0.1029；
+ * 拱为标准半圆 → 拱肩 fySpring = fyApex + 半径 ≈ 0.29；开口直通图底（无底杠——门）。
+ * ARCH_PUNCH 为抠窗参数（各内缩 ~0.003 留框唇；底边开放不缩）。
+ */
+const ARCH_PUNCH = { fx: 0.222, fyApex: 0.106, fyBottom: 0, fySpring: 0.29 };
+const ARCH_M = { fx: 0.219, fyApex: 0.1029, fySpring: 0.29 };
+/**
+ * 世界映射：窗宽（0.562w）= 世界 2；apex=+1.5；
+ * 窗底=图底，对齐到镜面底缘 -1.65（拱门无底杠，若仍按 -1.5 映射，
+ * 镜面 2.4×3.3 的下缘超填部分会从门洞下方露出一条）→ 窗高 = 3.15。
+ */
+const ARCH_WF = 1 - ARCH_M.fx * 2;
+const ARCH_HF = 1 - ARCH_M.fyApex;
+const ARCH_PLANE_W = 2 / ARCH_WF;
+const ARCH_PLANE_H = 3.15 / ARCH_HF;
+/** 面片 y：使贴图中 apex 落在世界 +1.5（面片底缘即窗底 -1.65） */
+const ARCH_MESH_Y = 1.5 - (0.5 - ARCH_M.fyApex) * ARCH_PLANE_H;
+/** 拱肩线的世界 y */
+const ARCH_SPRING_Y = 1.5 - ((ARCH_M.fySpring - ARCH_M.fyApex) / ARCH_HF) * 3.15;
+
+/**
+ * 「画界」拱形几何体：与拱窗同形；左右/拱顶外扩 pad 塞进框唇下，
+ * 底缘与镜底 -1.65 齐平（下方没有框可塞）。
+ * UV 重映射到旧矩形画界（2.4×3.3 居中）的坐标系，贴图构图与矩形版一致。
+ */
+function makeArchPortalGeometry(pad = 0.08): THREE.ShapeGeometry {
+  const hw = 1 + pad; // 半宽
+  const yB = -1.65;
+  const yA = 1.5 + pad;
+  const yS = ARCH_SPRING_Y;
+  const shape = new THREE.Shape();
+  shape.moveTo(-hw, yB);
+  shape.lineTo(-hw, yS);
+  // 从 π 顺时针到 0，经过 π/2（Y-up 拱顶）
+  shape.absellipse(0, yS, hw, yA - yS, Math.PI, 0, true, 0);
+  shape.lineTo(hw, yB);
+  shape.closePath();
+  const geom = new THREE.ShapeGeometry(shape, 48);
+  const pos = geom.attributes.position;
+  const uv = geom.attributes.uv;
+  for (let i = 0; i < pos.count; i++) {
+    uv.setXY(i, pos.getX(i) / 2.4 + 0.5, pos.getY(i) / 3.3 + 0.5);
+  }
+  uv.needsUpdate = true;
+  return geom;
+}
+
 /** 生成径向柔光贴图（白核 → 透明边），颜色由材质 color 控制 */
 function makeGlowTexture(): THREE.CanvasTexture {
   const size = 256;
@@ -217,14 +266,12 @@ function DreamParticles({ texture }: { texture: THREE.Texture }) {
 function MirrorFrame({ glow }: { glow: THREE.Texture }) {
   return (
     <group position={[0, 0, -0.06]}>
-      {/* 外框：近黑哑光窄框（宽的均匀发紫板 = 塑料感；深色窄框只给「份量」不抢戏） */}
+      {/* 外框：大理石白哑光窄框（与定稿贴图同方向；贴图缺失时的形近回退） */}
       <RoundedBox args={[2.42, 3.42, 0.08]} radius={0.04} smoothness={4}>
         <meshStandardMaterial
-          color="#0a0912"
-          metalness={0.35}
-          roughness={0.55}
-          emissive={ACCENT_3}
-          emissiveIntensity={0.03}
+          color="#e9e7e1"
+          metalness={0.05}
+          roughness={0.5}
         />
       </RoundedBox>
       {/* 发光细缘：4 根发光条拼成空心门框（Bloom 加持成光缘）——珠宝感的关键。
@@ -397,6 +444,12 @@ function MirrorAndCamera({
   const groupRef = useRef<THREE.Group>(null);
   const lookYRef = useRef(0);
   const { camera } = useThree();
+  // 画界的拱形几何体：画界在框前方（吞没时要盖框），矩形会在拱肩处穿帮，
+  // 故与拱窗同形外扩；UV 已重映射，贴图构图与矩形版一致
+  const archGeom = useMemo(() => makeArchPortalGeometry(), []);
+  // 镜面同理：框贴图拱肩外是键控透明区，矩形镜面的上角会从拱肩后穿出——
+  // 镜面也用拱形（pad 更大，整圈塞进框带之下；框带世界宽 ~0.33）
+  const mirrorGeom = useMemo(() => makeArchPortalGeometry(0.14), []);
   // 镜面用独立克隆贴图：呼吸动画改 offset/repeat，不能影响画界与碎片共享的原图
   const mirrorMap = useMemo(() => {
     const t = nebula.clone();
@@ -458,7 +511,9 @@ function MirrorAndCamera({
     // 严格顺序三拍（拍与拍零重叠——重叠正是「上一个动画没播完
     // 下一个已开始」的粗糙感来源）：
     //   第1拍 0~0.95s    碎裂完整谢幕：镜面缩没、碎片飞散并全部淡尽、白闪结束
-    //   第2拍 0.95~2.25s 显影+吞没：画界浮现并自框中生长满屏，相机轻推
+    //   第2拍 0.95~2.25s 显影+推进：画界在框中浮现（尺寸不动），相机加速推向
+    //                    画面直至穿过门框、画面吞满视野——是「我走进画里」，
+    //                    不是「画扑向我」（用户定稿 07-08：镜头推向画面）
     //   第3拍 2.25~2.6s  静止帧：满屏画面完全静止，路由切换的冻结藏在这里
     if (mirrorRef.current) {
       // 瞬时隐去：碎片与镜面同位同图，接管是无缝的——
@@ -469,16 +524,25 @@ function MirrorAndCamera({
       const pm = portalRef.current.material as THREE.MeshBasicMaterial;
       pm.opacity = 0;
       tl.to(pm, { opacity: 1, duration: 0.45, ease: "power2.out" }, 0.95);
-      tl.to(
-        portalRef.current.scale,
-        { x: 3.2, y: 3.2, duration: 1.3, ease: "power2.inOut" },
-        0.95,
-      );
     }
+    // 相机推进：归正 x/y 对准门心，z 一路推到画面跟前（z=1.1，距画界 ~0.98，
+    // 21:9 超宽屏也能满幅）。power2.in 先缓后急 = 坠入画中的加速度感。
+    // 推进全程 lookAt 跟随归正（视线从幕1的下俯回到画心），随位移逐帧应用。
+    const look = { y: lookYRef.current };
     tl.to(
       camera.position,
-      { z: 4.3, duration: 1.3, ease: "power1.inOut", delay: 0.95 },
-      0,
+      { x: 0, y: 0, z: 1.1, duration: 1.3, ease: "power2.in" },
+      0.95,
+    );
+    tl.to(
+      look,
+      {
+        y: 0,
+        duration: 1.3,
+        ease: "power2.out",
+        onUpdate: () => camera.lookAt(0, look.y, 0.12),
+      },
+      0.95,
     );
     tl.call(onComplete, [], 2.6);
     return () => {
@@ -488,18 +552,17 @@ function MirrorAndCamera({
 
   return (
     <group ref={groupRef}>
-      {/* 镜面 = 望进梦境的星云传送门（黑镜的黑色四边形随视差歪斜会显得别扭） */}
-      <mesh ref={mirrorRef} position={[0, 0, 0]}>
-        <planeGeometry args={[2.4, 3.3]} />
+      {/* 镜面 = 望进梦境的星云传送门（黑镜的黑色四边形随视差歪斜会显得别扭）；
+          拱形几何体，上角不再从拱肩后穿出 */}
+      <mesh ref={mirrorRef} position={[0, 0, 0]} geometry={mirrorGeom}>
         <meshBasicMaterial map={mirrorMap} />
       </mesh>
-      {/* 「画界」：碎镜后在镜框原位显影的梦境图（与镜面同尺寸同位置），
-          随后自框中向观者生长直至吞没画面——画框始终被画覆盖，无分离穿帮。
+      {/* 「画界」：碎镜后在拱窗原位显影的梦境图（拱形几何体，与拱窗同形），
+          相机随后加速推进穿框——画界在框前方（z=0.12），推进末段吞满视野。
           fog=false 保画面鲜活。
           注意：不用 visible=false 隐藏——opacity=0 保持渲染管线常驻，
           纹理/着色器在挂载时就上传编译好；否则触发瞬间首次上传 GPU 必掉帧 */}
-      <mesh ref={portalRef} position={[0, 0, 0.12]}>
-        <planeGeometry args={[2.4, 3.3]} />
+      <mesh ref={portalRef} position={[0, 0, 0.12]} geometry={archGeom}>
         <meshBasicMaterial map={nebula} transparent opacity={0} fog={false} depthWrite={false} />
       </mesh>
     </group>
@@ -511,9 +574,14 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
   const nebula = useMemo(makeNebulaTexture, []);
   const backdropCanvas = useMemo(makeBackdropTexture, []);
   // 定稿A「镜湖」素材（全部缺图回退现有画法）
-  // 优雅立镜（做旧暗铜+紫边缘光）：浏览器逐像素实测开口
-  // x 0.264 / 上 0.204（山墙顶）/ 下 0.160，抠窗略缩留框唇
-  const mirrorFrameTex = usePunchedFrame("/textures/mirror-frame.png", 0.267, 0.207, 0.163);
+  // 白大理石拱门框（用户定稿 07-08 二轮：门该是门不是相框）：开口实测值见 ARCH
+  const mirrorFrameTex = usePunchedFrame(
+    "/textures/mirror-frame-arch.png",
+    ARCH_PUNCH.fx,
+    ARCH_PUNCH.fyApex,
+    ARCH_PUNCH.fyBottom,
+    ARCH_PUNCH.fySpring,
+  );
   const cloudTex = useOptionalTexture("/textures/cloud-bank.png");
   // 天幕真图：gpt-image matte painting（程序化色晕画不出空气感），缺图回退 canvas 版
   const backdropImg = useOptionalTexture("/textures/gate-backdrop.png");
@@ -607,12 +675,12 @@ export function MirrorGate({ triggering, onComplete, act = 1 }: MirrorGateProps)
       </mesh>
       {mirrorFrameTex ? (
         <group position={[0, 0, -0.06]}>
-          {/* 优雅立镜框：窗=2×3 对齐镜心（窗心比图心低 0.022 → 面片上移补偿）；
-              镜面 2.4×3.3 超填于后，框带世界宽 ~0.5 全覆盖，杜绝露缝。
+          {/* 大理石拱门框：拱窗=2×3 对齐镜心（y 按实测窗心补偿）；
+              镜面 2.4×3.3 超填于后，框带全覆盖杜绝露缝（拱肩为框体，天然盖住镜面上角）。
               z=0.1（组内）→ 世界 0.04：必须在镜面(0)之前，框带才能压住超填镜缘；
-              画界在 0.12 更前，吞没时盖框 ✓ */}
-          <mesh position={[0, 0.1, 0.1]}>
-            <planeGeometry args={[2 / 0.472, 3 / 0.636]} />
+              拱形画界在 0.12 更前，推进穿框时盖框 ✓ */}
+          <mesh position={[0, ARCH_MESH_Y, 0.1]}>
+            <planeGeometry args={[ARCH_PLANE_W, ARCH_PLANE_H]} />
             <meshBasicMaterial map={mirrorFrameTex} transparent depthWrite={false} />
           </mesh>
           {/* 辉光压暗：镜面隐去后这两层不能裸露成一块淡紫平板 */}

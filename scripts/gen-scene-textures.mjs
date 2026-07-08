@@ -38,10 +38,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const TEXTURES = [
   {
-    name: "mirror-frame",
+    // 用户定稿（07-08 二轮）：白大理石不变，矩形改「圆拱门」——门该是门，不是相框
+    name: "mirror-frame-arch",
     size: "1024x1536",
     prompt:
-      "elegant antique standing mirror frame, weathered dark bronze with delicate refined engraved detailing along the moulding, moderately ornamented — graceful, not baroque, gentle pediment top, soft moonlit violet rim light catching the frame edges as if lit by a night sky, matte painterly finish consistent with a dark violet cloudscape matte painting, complete frame shown in full, rectangular opening, portrait orientation, photographed perfectly straight-on and centered, the opening inside the frame is pure solid black, the background outside the frame is pure solid black, no glass, no text",
+      "elegant minimal doorway portal frame carved from white Carrara marble, tall rectangular sides with a smooth semicircular round arch top, clean straight profile, subtle soft grey stone veining, thin refined border, quiet and serene, softly lit by cool moonlight with a faint violet tint in the shadows, matte painterly finish, complete arch frame shown in full, arched opening, portrait orientation, photographed perfectly straight-on and centered, frame border occupies about 12 percent of the image width on each side, the opening inside the arch is pure solid black, the background outside the frame is pure solid black, no keystone, no ornament, no carving, no pediment, no columns, no steps, no text",
   },
   {
     name: "mirror-dream",

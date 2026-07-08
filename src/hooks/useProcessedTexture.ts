@@ -25,11 +25,21 @@ function toTexture(c: HTMLCanvasElement): THREE.Texture {
   return t;
 }
 
-/** 抠透明窗（fx=左右边框占比，fyTop/fyBottom=上下边框占比，可不对称——立镜有冠饰），羽化 18px */
-export function usePunchedFrame(url: string, fx: number, fyTop: number, fyBottom = fyTop): THREE.Texture | null {
+/**
+ * 抠透明窗（fx=左右边框占比，fyTop/fyBottom=上下边框占比，可不对称——立镜有冠饰），羽化 18px。
+ * 传 fySpring（拱肩线占比，介于 fyTop 与 1-fyBottom 之间）时窗形为「圆拱门」：
+ * 直边到拱肩，拱肩以上为半椭圆拱顶（apex=fyTop）。
+ */
+export function usePunchedFrame(
+  url: string,
+  fx: number,
+  fyTop: number,
+  fyBottom = fyTop,
+  fySpring?: number,
+): THREE.Texture | null {
   const [tex, setTex] = useState<THREE.Texture | null>(null);
   useEffect(() => {
-    const key = `punch:${url}:${fx}:${fyTop}:${fyBottom}`;
+    const key = `punch:${url}:${fx}:${fyTop}:${fyBottom}:${fySpring ?? "rect"}`;
     if (!cache.has(key)) {
       cache.set(
         key,
@@ -47,12 +57,29 @@ export function usePunchedFrame(url: string, fx: number, fyTop: number, fyBottom
               /* 无 filter 支持则硬边 */
             }
             ctx.fillStyle = "#fff";
-            ctx.fillRect(
-              c.width * fx,
-              c.height * fyTop,
-              c.width * (1 - fx * 2),
-              c.height * (1 - fyTop - fyBottom),
-            );
+            if (fySpring !== undefined) {
+              // 拱门窗：直边（底→拱肩）+ 半椭圆拱顶（拱肩→apex）。
+              // canvas 坐标 y 向下，ellipse 从 π 顺时针到 0 经过 3π/2（正上方）
+              const x0 = c.width * fx;
+              const x1 = c.width * (1 - fx);
+              const yB = c.height * (1 - fyBottom);
+              const yS = c.height * fySpring;
+              const yA = c.height * fyTop;
+              ctx.beginPath();
+              ctx.moveTo(x0, yB);
+              ctx.lineTo(x0, yS);
+              ctx.ellipse((x0 + x1) / 2, yS, (x1 - x0) / 2, yS - yA, 0, Math.PI, 0, false);
+              ctx.lineTo(x1, yB);
+              ctx.closePath();
+              ctx.fill();
+            } else {
+              ctx.fillRect(
+                c.width * fx,
+                c.height * fyTop,
+                c.width * (1 - fx * 2),
+                c.height * (1 - fyTop - fyBottom),
+              );
+            }
             // 外围纯黑底转透明（亮度键控）：gpt-image 的黑背景在非纯黑场景前
             // 会显形成一块黑板；框体自身暗部仅极暗像素受轻微影响，视觉无损
             ctx.globalCompositeOperation = "source-over";
@@ -77,7 +104,7 @@ export function usePunchedFrame(url: string, fx: number, fyTop: number, fyBottom
     return () => {
       active = false;
     };
-  }, [url, fx, fyTop, fyBottom]);
+  }, [url, fx, fyTop, fyBottom, fySpring]);
   return tex;
 }
 
