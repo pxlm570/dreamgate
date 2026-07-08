@@ -1,5 +1,6 @@
 // Gallery 组件 barrel 导出
 export { CorridorScene, CorridorWorld } from "./CorridorScene";
+export { corridorAtmosphere } from "./atmosphere";
 export type { CorridorSceneProps } from "./CorridorScene";
 export { DreamDoor } from "./DreamDoor";
 export type { DreamDoorProps } from "./DreamDoor";

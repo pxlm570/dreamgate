@@ -11,17 +11,11 @@ import type { Dream } from "@/lib/types";
 import { getEmotionByWord } from "@/lib/emotions";
 import { useOptionalTexture } from "@/hooks/useOptionalTexture";
 import { DreamDoor } from "./DreamDoor";
+import { FOG_BASE, mixColor } from "./atmosphere";
 
-// 基调从近黑提到深紫灰（有色温的暗才有留白感，漆黑只有虚无感）
-const FOG_BASE = "#0b0a15";
 const DOOR_SPACING = 4; // 每扇门 z 间距
 const DOOR_OFFSET_X = 3; // 门距走廊中轴 x 偏移
 const CORRIDOR_HALF_HEIGHT = 3;
-
-/** hex 基底 + accent 按比例混合，返回 three.Color */
-function mixColor(base: string, accent: string, ratio: number): THREE.Color {
-  return new THREE.Color(base).lerp(new THREE.Color(accent), ratio);
-}
 
 /** 尽头文案贴图：一次性绘制（Html 会每帧写 DOM transform——滚动抖动源之一） */
 function makeEndTextTexture(): { tex: THREE.CanvasTexture; aspect: number } {
@@ -370,7 +364,16 @@ function CameraRig({
   // 「像推开大门走进来」而非黑屏后原地出现
   const introRef = useRef(reduceMotion ? 0 : 6);
   useEffect(() => {
-    // 相机直接摆到门外起点，随后每帧向内 damp（否则会先倒退到起点再前进）
+    // 相机接力（单世界隐形剪辑的另一半）：挂载即把相机瞬移到走廊门外起点并
+    // 恢复走廊视角参数（fov 55、归零 x/y——门场景推进后相机可能带残余偏移），
+    // 随后每帧向内 damp（否则会先倒退到起点再前进）
+    const cam = camera as THREE.PerspectiveCamera;
+    if (cam.isPerspectiveCamera && cam.fov !== 55) {
+      cam.fov = 55;
+      cam.updateProjectionMatrix();
+    }
+    camera.position.x = 0;
+    camera.position.y = 0;
     if (!reduceMotion) camera.position.z = startZ + introRef.current;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -464,12 +467,18 @@ export interface CorridorSceneProps {
   diving?: boolean;
   /** 点击画布空白处（未命中任何门）——外部用于退出聚焦 */
   onMissClick?: () => void;
+  /** 独立页模式（默认）：自渲染背景/雾/后处理；单世界 World 统一管理时置 false */
+  standalone?: boolean;
+  /** 相机控制是否激活（单世界 gate 阶段置 false，交给镜之门运镜） */
+  cameraEnabled?: boolean;
+  /** 场景整组可见性（单世界 gate 阶段隐藏走廊） */
+  visible?: boolean;
 }
 
 /**
  * CorridorWorld — 走廊场景内容（不含 Canvas 壳）。
  * 融合单世界 Step1 提取：可作为独立页 Canvas 的孩子（CorridorScene），
- * 也可挂进未来的单世界 World Canvas 与镜之门共存。
+ * 也可挂进单世界 World Canvas 与镜之门共存（standalone=false + visible/cameraEnabled 切换）。
  */
 export function CorridorWorld({
   dreams,
@@ -480,6 +489,9 @@ export function CorridorWorld({
   onLowPerformance,
   focusedId,
   diving = false,
+  standalone = true,
+  cameraEnabled = true,
+  visible = true,
 }: Omit<CorridorSceneProps, "onMissClick">) {
   // 最近 20 条，最新在前（走廊入口先看到最新梦境）
   const recent = dreams.slice(-20).reverse();
@@ -509,17 +521,27 @@ export function CorridorWorld({
 
   return (
     <>
-      <color attach="background" args={[fogHex]} />
-      {withShaderFog && <fogExp2 attach="fog" args={[fogHex, 0.038]} />}
+      {standalone && (
+        <>
+          <color attach="background" args={[fogHex]} />
+          {withShaderFog && <fogExp2 attach="fog" args={[fogHex, 0.038]} />}
+        </>
+      )}
+      {/* 场景本体：单世界模式下经 visible 整组显隐（隐藏时灯光/物体均不参与渲染，
+          纹理/着色器常驻 GPU——切换零上传成本） */}
+      <group visible={visible}>
       {/* 多层光源：环境 + 半球 + 顶光（情绪色）+ 辅光 */}
       <ambientLight intensity={0.42} />
       <hemisphereLight color={accentColor} groundColor={FOG_BASE} intensity={0.34} />
       <pointLight position={[0, 4, 2]} intensity={0.6} color={accentColor} distance={15} />
       <pointLight position={[0, -2, 4]} intensity={0.3} color="#c9b8e8" distance={10} />
       <CorridorWalls length={length} accentColor={accentColor} glowTex={glowTex} endMist={endMist} wallPanel={wallPanel} floorBase={floorTexBase} ceilBase={ceilTexBase} />
-      <CameraRig scrollRef={scrollRef} length={length} reduceMotion={reduceMotion} focusTarget={focusTarget} diving={diving} />
+      {cameraEnabled && (
+        <CameraRig scrollRef={scrollRef} length={length} reduceMotion={reduceMotion} focusTarget={focusTarget} diving={diving} />
+      )}
       {!reduceMotion && <CorridorDust length={length} color={accentColor} texture={glowTex} />}
-      {!reduceMotion && <FpsSampler onLow={onLowPerformance} />}
+      {/* 帧率采样仅在走廊真正接管后启动（隐藏态的帧率不代表走廊性能） */}
+      {!reduceMotion && cameraEnabled && <FpsSampler onLow={onLowPerformance} />}
       {recent.map((d, i) => {
         const side = i % 2 === 0 ? -1 : 1;
         const rotationY = side === -1 ? Math.PI / 2 : -Math.PI / 2;
@@ -538,23 +560,26 @@ export function CorridorWorld({
           />
         );
       })}
-      {/* 后处理：Bloom 让门框辉光与尽头光晕扩散成电影感 */}
-      <EffectComposer>
-        <Bloom
-          intensity={0.85}
-          luminanceThreshold={0.28}
-          luminanceSmoothing={0.5}
-          mipmapBlur
-          radius={0.65}
-        />
-        {/* 暗角减弱：过重的暗角把走廊四周压成漆黑，吃掉建筑线条的留白层次 */}
-        <Vignette eskil={false} offset={0.16} darkness={0.62} />
-      </EffectComposer>
+      </group>
+      {/* 后处理：Bloom 让门框辉光与尽头光晕扩散成电影感（单世界模式由 World 统一提供） */}
+      {standalone && (
+        <EffectComposer>
+          <Bloom
+            intensity={0.85}
+            luminanceThreshold={0.28}
+            luminanceSmoothing={0.5}
+            mipmapBlur
+            radius={0.65}
+          />
+          {/* 暗角减弱：过重的暗角把走廊四周压成漆黑，吃掉建筑线条的留白层次 */}
+          <Vignette eskil={false} offset={0.16} darkness={0.62} />
+        </EffectComposer>
+      )}
     </>
   );
 }
 
-/** 独立页面用的 Canvas 壳（GalleryPage 现行挂载方式）；场景内容在 CorridorWorld */
+/** 独立 Canvas 壳（单世界 WorldPage 已改用 CorridorWorld；此壳留作独立复用） */
 export function CorridorScene({ onMissClick, ...worldProps }: CorridorSceneProps) {
   // dpr 移动端降低，桌面端封顶 1.5
   const dpr: [number, number] =

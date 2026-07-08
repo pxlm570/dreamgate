@@ -9,8 +9,7 @@ import { useDreamStore } from '@/store/useDreamStore';
  * 页面（镜门 / 画廊 / 分享）按需加载，缩小首屏 bundle。
  * HashRouter 不影响代码分割（其仅关乎 SPA fallback，与按需 import 无关）。
  */
-const GatePage = lazy(() => import('@/pages/GatePage'));
-const GalleryPage = lazy(() => import('@/pages/GalleryPage'));
+const WorldPage = lazy(() => import('@/pages/WorldPage'));
 const RecordPage = lazy(() => import('@/pages/RecordPage'));
 const DreamRoomPage = lazy(() => import('@/pages/DreamRoomPage'));
 const SharePage = lazy(() => import('@/pages/SharePage'));
@@ -53,8 +52,12 @@ export default function App() {
     <Router>
       <Suspense fallback={<RouteFallback />}>
         <Routes>
-          <Route path="/" element={<GatePage />} />
-          <Route path="/gallery" element={<GalleryPage />} />
+          {/* 单世界 layout route：镜之门与 3D 走廊共享一个持久 Canvas，
+              "/" ↔ "/gallery" 切换时 WorldPage 不重挂——转场只是场景组翻转+相机接力 */}
+          <Route element={<WorldPage />}>
+            <Route path="/" element={null} />
+            <Route path="/gallery" element={null} />
+          </Route>
           <Route path="/record" element={<RecordPage />} />
           <Route path="/dream/:id" element={<DreamRoomPage />} />
           <Route path="/share/:id" element={<SharePage />} />

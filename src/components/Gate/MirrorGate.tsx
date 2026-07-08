@@ -433,11 +433,14 @@ function MirrorAndCamera({
   onComplete,
   nebula,
   act,
+  cameraEnabled = true,
 }: {
   triggering: boolean;
   onComplete: () => void;
   nebula: THREE.Texture;
   act: 0 | 1;
+  /** 单世界模式下走廊接管相机后置 false（idle 漂移与触发推进都停用） */
+  cameraEnabled?: boolean;
 }) {
   const mirrorRef = useRef<THREE.Mesh>(null);
   const portalRef = useRef<THREE.Mesh>(null);
@@ -457,10 +460,28 @@ function MirrorAndCamera({
     return t;
   }, [nebula]);
 
+  // 相机接力（单世界）：门重新接管相机时恢复 gate 视角参数；
+  // 并在非触发态复位镜面/画界（从走廊回退到门时，转场留下的隐藏镜面要复原）
+  useEffect(() => {
+    if (!cameraEnabled) return;
+    const cam = camera as THREE.PerspectiveCamera;
+    if (cam.isPerspectiveCamera && cam.fov !== 50) {
+      cam.fov = 50;
+      cam.updateProjectionMatrix();
+    }
+  }, [cameraEnabled, camera]);
+  useEffect(() => {
+    if (triggering) return;
+    if (mirrorRef.current) mirrorRef.current.visible = true;
+    if (portalRef.current) {
+      (portalRef.current.material as THREE.MeshBasicMaterial).opacity = 0;
+    }
+  }, [triggering]);
+
   // idle 阶段：视差全部交给相机环绕漂移；镜面不再自转
   // （镜面倾斜会与固定镜框/发光缘产生相对错动，正是「黑色部分随鼠标变形」的来源）
   useFrame((state) => {
-    if (!groupRef.current) return;
+    if (!groupRef.current || !cameraEnabled) return;
     const px = state.pointer.x;
     const py = state.pointer.y;
     if (!triggering) {
@@ -506,7 +527,7 @@ function MirrorAndCamera({
   });
 
   useEffect(() => {
-    if (!triggering) return;
+    if (!triggering || !cameraEnabled) return;
     const tl = gsap.timeline();
     // 严格顺序三拍（拍与拍零重叠——重叠正是「上一个动画没播完
     // 下一个已开始」的粗糙感来源）：
@@ -548,7 +569,7 @@ function MirrorAndCamera({
     return () => {
       tl.kill();
     };
-  }, [triggering, camera, onComplete]);
+  }, [triggering, camera, onComplete, cameraEnabled]);
 
   return (
     <group ref={groupRef}>
@@ -569,14 +590,22 @@ function MirrorAndCamera({
   );
 }
 
+/** 镜之门场景的氛围参数（单世界 World 统一管理雾/背景时取用） */
+export const GATE_ATMOSPHERE = { color: FOG_COLOR, density: 0.055 } as const;
+
 /**
  * GateScene — 镜之门场景内容（不含 Canvas 壳）。
  * 融合单世界 Step1 提取：可作为独立页 Canvas 的孩子（MirrorGate），
- * 也可挂进未来的单世界 World Canvas 与走廊共存。
- * 注：<color>/<fogExp2> attach 到父级 scene——单世界模式下由 World 统一接管氛围时，
- * 应由外层决定是否渲染（Step2 处理）。
+ * 也可挂进单世界 World Canvas 与走廊共存（standalone=false + visible/cameraEnabled 切换）。
  */
-export function GateScene({ triggering, onComplete, act = 1 }: MirrorGateProps) {
+export function GateScene({
+  triggering,
+  onComplete,
+  act = 1,
+  standalone = true,
+  cameraEnabled = true,
+  visible = true,
+}: MirrorGateProps) {
   const glow = useMemo(makeGlowTexture, []);
   const nebula = useMemo(makeNebulaTexture, []);
   const backdropCanvas = useMemo(makeBackdropTexture, []);
@@ -599,8 +628,15 @@ export function GateScene({ triggering, onComplete, act = 1 }: MirrorGateProps) 
   const mirrorTex = dreamTex ?? nebula;
   return (
     <>
-      <color attach="background" args={[FOG_COLOR]} />
-      <fogExp2 attach="fog" args={[FOG_COLOR, 0.055]} />
+      {standalone && (
+        <>
+          <color attach="background" args={[GATE_ATMOSPHERE.color]} />
+          <fogExp2 attach="fog" args={[GATE_ATMOSPHERE.color, GATE_ATMOSPHERE.density]} />
+        </>
+      )}
+      {/* 场景本体：单世界模式下经 visible 整组显隐（隐藏时灯光/物体均不参与渲染，
+          但纹理/着色器常驻 GPU——切换零上传成本，这正是融合的意义） */}
+      <group visible={visible}>
       {/* 光源：环境光 + 半球光 + 顶光（紫白）+ 侧光（青绿）+ 辅光（紫罗兰） */}
       <ambientLight intensity={0.5} />
       <hemisphereLight color={ACCENT} groundColor={FOG_COLOR} intensity={0.38} />
@@ -706,26 +742,35 @@ export function GateScene({ triggering, onComplete, act = 1 }: MirrorGateProps) 
         </>
       )}
 
-      <MirrorAndCamera triggering={triggering} onComplete={onComplete} nebula={mirrorTex} act={act} />
+      <MirrorAndCamera
+        triggering={triggering}
+        onComplete={onComplete}
+        nebula={mirrorTex}
+        act={act}
+        cameraEnabled={cameraEnabled}
+      />
       <Shards triggered={triggering} nebula={mirrorTex} />
       <DreamParticles texture={glow} />
-      {/* 后处理：Bloom 辉光 + Vignette 暗角，电影感 */}
-      <EffectComposer>
-        <Bloom
-          intensity={0.95}
-          luminanceThreshold={0.22}
-          luminanceSmoothing={0.5}
-          mipmapBlur
-          radius={0.72}
-        />
-        {/* 暗角减弱：0.88 会把四周压成漆黑，吃掉留白层次 */}
-        <Vignette eskil={false} offset={0.12} darkness={0.7} />
-      </EffectComposer>
+      </group>
+      {/* 后处理：Bloom 辉光 + Vignette 暗角，电影感（单世界模式由 World 统一提供） */}
+      {standalone && (
+        <EffectComposer>
+          <Bloom
+            intensity={0.95}
+            luminanceThreshold={0.22}
+            luminanceSmoothing={0.5}
+            mipmapBlur
+            radius={0.72}
+          />
+          {/* 暗角减弱：0.88 会把四周压成漆黑，吃掉留白层次 */}
+          <Vignette eskil={false} offset={0.12} darkness={0.7} />
+        </EffectComposer>
+      )}
     </>
   );
 }
 
-/** 独立页面用的 Canvas 壳（GatePage 现行挂载方式）；场景内容在 GateScene */
+/** 独立 Canvas 壳（单世界 WorldPage 已改用 GateScene；此壳留作独立复用） */
 export function MirrorGate(props: MirrorGateProps) {
   return (
     <Canvas
@@ -746,4 +791,10 @@ export interface MirrorGateProps {
   onComplete: () => void;
   /** 分幕（kimi 式舞台）：0=远景幕，1=近景幕；默认 1 保持旧行为 */
   act?: 0 | 1;
+  /** 独立页模式（默认）：自渲染背景/雾/后处理；单世界 World 统一管理时置 false */
+  standalone?: boolean;
+  /** 相机控制是否激活（单世界 corridor 阶段置 false，交给走廊 CameraRig） */
+  cameraEnabled?: boolean;
+  /** 场景整组可见性（单世界 corridor 阶段隐藏门场景） */
+  visible?: boolean;
 }

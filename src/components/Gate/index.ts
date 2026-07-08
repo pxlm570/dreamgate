@@ -1,4 +1,4 @@
-export { MirrorGate, GateScene } from "./MirrorGate";
+export { MirrorGate, GateScene, GATE_ATMOSPHERE } from "./MirrorGate";
 export type { MirrorGateProps } from "./MirrorGate";
 export { GateOverlay } from "./GateOverlay";
 export type { GateOverlayProps } from "./GateOverlay";
