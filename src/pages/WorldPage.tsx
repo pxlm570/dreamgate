@@ -363,15 +363,17 @@ export default function WorldPage() {
               dreams={dreams}
               withShaderFog={withShaderFog}
             />
+            {/* 门体常驻可见：走廊阶段回头能看到来路的拱门（门内星云仍在）——
+                空间连续感；镜湖环境（天幕/湖面/云堤）自 crossing 起隐去 */}
             <GateScene
               standalone={false}
-              visible={stage === "gate"}
+              visible
               cameraEnabled={stage === "gate"}
               triggering={stage === "gate" && phase === "triggered"}
               onComplete={handleComplete}
               act={act}
               originZ={GATE_ORIGIN_Z}
-              hideEnvirons={crossing}
+              hideEnvirons={crossing || stage === "corridor"}
               onShatter={handleShatter}
             />
             {corridorMounted && (

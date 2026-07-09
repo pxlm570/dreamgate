@@ -6,7 +6,7 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import {
   Backdrop,
   Display,
@@ -110,6 +110,31 @@ export default function ReportPage() {
           <div className="space-y-14 sm:space-y-20">
             {/* —— 核心：跨梦模式识别 —— */}
             <CrossDreamInsights dreams={dreams} />
+
+            {/* —— 通往梦池：纵向洞察之后，横向共鸣（报告 ↔ 梦池的叙事衔接） —— */}
+            <motion.section
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-8% 0px" }}
+              transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+              className="flex flex-col items-center gap-4 border-y border-white/5 py-10 text-center"
+            >
+              <Caption
+                as="div"
+                className="text-[11px] uppercase tracking-[0.3em] text-dreamgate-text-muted"
+              >
+                梦池 · 共鸣
+              </Caption>
+              <p className="max-w-md font-display text-lg text-dreamgate-text-primary sm:text-xl">
+                你的意象并不孤单——梦池里漂着与你相似的梦
+              </p>
+              <Link to="/pool">
+                <Button variant="ethereal" size="sm">
+                  前往梦池 · 寻找共鸣
+                  <ArrowRight size={14} />
+                </Button>
+              </Link>
+            </motion.section>
 
             {/* —— 情绪图谱明细 —— */}
             <section>

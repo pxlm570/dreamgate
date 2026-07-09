@@ -62,10 +62,10 @@ export function CssMirrorFallback({
         }}
       />
 
-      {/* 镜面（idle 时显示，触发后淡出收缩） */}
+      {/* 大理石拱门（idle 时显示，触发后淡出收缩）——与 3D 版白卡拉拉拱门同一造型语言 */}
       <motion.div
         className="absolute left-1/2 top-1/2"
-        style={{ width: "min(24vw, 280px)", height: "min(36vw, 420px)" }}
+        style={{ width: "min(26vw, 300px)", height: "min(40vw, 460px)" }}
         initial={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
         animate={{
           opacity: triggering ? 0 : 1,
@@ -75,15 +75,29 @@ export function CssMirrorFallback({
         }}
         transition={{ duration: 0.4, ease: "easeIn" }}
       >
+        {/* 门框：白大理石渐变 + 拱顶圆角；底部开放（门无底杠） */}
         <div
-          className="h-full w-full rounded-sm border border-dreamgate-ethereal/30"
+          className="h-full w-full"
           style={{
-            background:
-              "linear-gradient(135deg, rgba(201,184,232,0.14), rgba(78,201,176,0.06) 50%, rgba(201,184,232,0.2))",
+            borderRadius: "50% 50% 0 0 / 32% 32% 0 0",
+            padding: "min(2.4vw, 26px)",
+            paddingBottom: 0,
+            background: "linear-gradient(160deg, #f2f0ec 0%, #d8d5cf 48%, #ecebe6 100%)",
             boxShadow:
-              "0 0 70px rgba(201,184,232,0.28), inset 0 0 50px rgba(201,184,232,0.18)",
+              "0 0 70px rgba(201,184,232,0.3), inset 0 1px 14px rgba(255,255,255,0.6), inset 0 -6px 18px rgba(110,100,135,0.28)",
           }}
-        />
+        >
+          {/* 门洞：梦境画（缺图时渐变底自然兜底），拱形裁切 */}
+          <div
+            className="h-full w-full overflow-hidden"
+            style={{
+              borderRadius: "50% 50% 0 0 / 34% 34% 0 0",
+              background:
+                "linear-gradient(135deg, rgba(139,92,246,0.3), rgba(78,201,176,0.1) 55%, rgba(164,80,139,0.28)), url(/textures/mirror-dream.png) center / cover no-repeat, linear-gradient(160deg, #171230, #0b0918)",
+              boxShadow: "inset 0 0 46px rgba(12,8,30,0.6)",
+            }}
+          />
+        </div>
       </motion.div>
 
       {/* 碎片飞散（触发时显示） */}

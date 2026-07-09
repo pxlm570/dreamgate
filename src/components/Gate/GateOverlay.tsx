@@ -127,7 +127,7 @@ export function GateOverlay({ visible, act = 1 }: GateOverlayProps) {
             >
               <div className="h-px w-32 bg-gradient-to-r from-transparent via-dreamgate-ethereal/70 to-transparent" />
               <p className="mt-5 max-w-md text-center font-body text-sm italic tracking-wide text-dreamgate-text-secondary md:text-base">
-                在镜面之后，藏着你尚未读懂的自己
+                在这扇门之后，藏着你尚未读懂的自己
               </p>
               <div className="mt-6 flex flex-col items-center gap-2.5">
                 <Caption className="block text-xs uppercase tracking-[0.5em] text-dreamgate-text-secondary md:text-sm">
