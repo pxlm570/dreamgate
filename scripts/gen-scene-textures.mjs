@@ -38,11 +38,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const TEXTURES = [
   {
-    // 用户定稿（07-08 二轮）：白大理石不变，矩形改「圆拱门」——门该是门，不是相框
+    // 用户三轮反馈（07-09）：白大理石拱门保持，但太平面——加立体线脚与克制刻线雕饰
     name: "mirror-frame-arch",
     size: "1024x1536",
     prompt:
-      "elegant minimal doorway portal frame carved from white Carrara marble, tall rectangular sides with a smooth semicircular round arch top, clean straight profile, subtle soft grey stone veining, thin refined border, quiet and serene, softly lit by cool moonlight with a faint violet tint in the shadows, matte painterly finish, complete arch frame shown in full, arched opening, portrait orientation, photographed perfectly straight-on and centered, frame border occupies about 12 percent of the image width on each side, the opening inside the arch is pure solid black, the background outside the frame is pure solid black, no keystone, no ornament, no carving, no pediment, no columns, no steps, no text",
+      "elegant doorway portal frame carved from white Carrara marble, tall straight sides with a smooth semicircular round arch top, sculpted stepped moulding profile with two thin concentric carved grooves following the full arch and sides, softly beveled inner edge, subtle soft grey stone veining, gentle three-quarter lighting from upper left revealing the depth of the mouldings with delicate shadows inside the carved lines, faint violet moonlight tint in the shadows, matte painterly finish, refined and restrained ornament, complete arch frame shown in full, arched opening, portrait orientation, photographed perfectly straight-on and centered, frame border occupies about 13 percent of the image width on each side, the opening inside the arch is pure solid black, the background outside the frame is pure solid black, no keystone, no figures, no floral carving, no pediment, no columns, no steps, no text",
   },
   {
     name: "mirror-dream",

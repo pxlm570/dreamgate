@@ -10,7 +10,6 @@ import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import * as THREE from "three";
 import gsap from "gsap";
 import { useOptionalTexture } from "@/hooks/useOptionalTexture";
-import { usePunchedFrame } from "@/hooks/useProcessedTexture";
 
 // 基调从近黑提到深紫灰：留白要有层次的「空」，不是漆黑（noomo 的暗都是有色温的）
 const FOG_COLOR = "#0d0c19";
@@ -19,26 +18,28 @@ const ACCENT_2 = "#4ec9b0";
 const ACCENT_3 = "#8b5cf6"; // 紫罗兰辉光辅色
 
 /**
- * 拱门框贴图开口实测值（PowerShell 逐像素，System.Drawing，1024×1536）：
- * 直边内缘 fx=0.219（左右对称）；拱顶内缘 fyApex=0.1029；
- * 拱为标准半圆 → 拱肩 fySpring = fyApex + 半径 ≈ 0.29；开口直通图底（无底杠——门）。
- * ARCH_PUNCH 为抠窗参数（各内缩 ~0.003 留框唇；底边开放不缩）。
+ * 拱门框贴图开口实测值（PowerShell 逐像素，System.Drawing，1024×1536，v2 雕饰版）：
+ * 直边内缘 fx≈0.1768（左右均值）；拱顶内缘 fyApex=0.1022；
+ * 拱为标准半圆 → 拱肩 fySpring = fyApex + 半径(0.2155h) ≈ 0.318；开口直通图底（门）。
+ * 外缘：侧带宽 0.1367w、拱顶带厚 0.0938h（实体几何外轮廓按 ~92% 内缩，保前盖不采黑底）。
  */
-const ARCH_PUNCH = { fx: 0.222, fyApex: 0.106, fyBottom: 0, fySpring: 0.29 };
-const ARCH_M = { fx: 0.219, fyApex: 0.1029, fySpring: 0.29 };
+const ARCH_M = { fx: 0.1768, fyApex: 0.1022, fySpring: 0.318 };
 /**
- * 世界映射：窗宽（0.562w）= 世界 2；apex=+1.5；
+ * 世界映射：窗宽（0.6465w）= 世界 2；apex=+1.5；
  * 窗底=图底，对齐到镜面底缘 -1.65（拱门无底杠，若仍按 -1.5 映射，
- * 镜面 2.4×3.3 的下缘超填部分会从门洞下方露出一条）→ 窗高 = 3.15。
+ * 镜面下缘超填部分会从门洞下方露出一条）→ 窗高 = 3.15。
  */
 const ARCH_WF = 1 - ARCH_M.fx * 2;
 const ARCH_HF = 1 - ARCH_M.fyApex;
 const ARCH_PLANE_W = 2 / ARCH_WF;
 const ARCH_PLANE_H = 3.15 / ARCH_HF;
-/** 面片 y：使贴图中 apex 落在世界 +1.5（面片底缘即窗底 -1.65） */
+/** 贴图平面 y：使贴图中 apex 落在世界 +1.5（底缘即窗底 -1.65） */
 const ARCH_MESH_Y = 1.5 - (0.5 - ARCH_M.fyApex) * ARCH_PLANE_H;
 /** 拱肩线的世界 y */
 const ARCH_SPRING_Y = 1.5 - ((ARCH_M.fySpring - ARCH_M.fyApex) / ARCH_HF) * 3.15;
+/** 门带世界宽（外轮廓用，按实测 92% 内缩：侧 0.1367w→0.39、顶 0.0938h→0.30） */
+const ARCH_BAND_X = 0.39;
+const ARCH_BAND_TOP = 0.3;
 
 /**
  * 「画界」拱形几何体：与拱窗同形；左右/拱顶外扩 pad 塞进框唇下，
@@ -62,6 +63,50 @@ function makeArchPortalGeometry(pad = 0.08): THREE.ShapeGeometry {
   const uv = geom.attributes.uv;
   for (let i = 0; i < pos.count; i++) {
     uv.setXY(i, pos.getX(i) / 2.4 + 0.5, pos.getY(i) / 3.3 + 0.5);
+  }
+  uv.needsUpdate = true;
+  return geom;
+}
+
+/**
+ * 拱门实体几何（用户三轮反馈 07-09：门框太平面 → 真三维）：
+ * ∩ 形单轮廓（外缘 - 门洞）挤出 depth 厚度。门洞边界由几何定义——
+ * 画面（镜面）藏在门体厚度内，被门洞内壁(jamb)深度剔除，从根上杜绝露边；
+ * 内壁在相机视差下真实可见 = 立体感来源。
+ * 材质组：0=前后盖（前盖贴大理石雕饰图，UV 映射到贴图平面坐标），1=侧壁（纯大理石受光）。
+ */
+function makeArchSolidGeometry(depth = 0.24): THREE.ExtrudeGeometry {
+  const wIn = 1;
+  const wOut = 1 + ARCH_BAND_X;
+  const yB = -1.65;
+  const yS = ARCH_SPRING_Y;
+  const yAIn = 1.5;
+  const yAOut = 1.5 + ARCH_BAND_TOP;
+  const s = new THREE.Shape();
+  // 外缘：左腿底 → 左外侧上行 → 外拱（π→0 经顶）→ 右外侧下行 → 右腿底
+  s.moveTo(-wOut, yB);
+  s.lineTo(-wOut, yS);
+  s.absellipse(0, yS, wOut, yAOut - yS, Math.PI, 0, true, 0);
+  s.lineTo(wOut, yB);
+  // 内缘（反向回描）：右腿底内侧 → 内拱（0→π 经顶）→ 左腿底内侧 → close
+  s.lineTo(wIn, yB);
+  s.lineTo(wIn, yS);
+  s.absellipse(0, yS, wIn, yAIn - yS, 0, Math.PI, false, 0);
+  s.lineTo(-wIn, yB);
+  s.closePath();
+  const geom = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false, curveSegments: 48 });
+  // 前后盖 UV：映射到贴图平面坐标系（ARCH_PLANE_W/H 中心在 ARCH_MESH_Y）
+  const pos = geom.attributes.position;
+  const norm = geom.attributes.normal;
+  const uv = geom.attributes.uv;
+  for (let i = 0; i < pos.count; i++) {
+    if (Math.abs(norm.getZ(i)) > 0.9) {
+      uv.setXY(
+        i,
+        pos.getX(i) / ARCH_PLANE_W + 0.5,
+        (pos.getY(i) - ARCH_MESH_Y) / ARCH_PLANE_H + 0.5,
+      );
+    }
   }
   uv.needsUpdate = true;
   return geom;
@@ -600,14 +645,10 @@ export function GateScene({
   const nebula = useMemo(makeNebulaTexture, []);
   const backdropCanvas = useMemo(makeBackdropTexture, []);
   // 定稿A「镜湖」素材（全部缺图回退现有画法）
-  // 白大理石拱门框（用户定稿 07-08 二轮：门该是门不是相框）：开口实测值见 ARCH
-  const mirrorFrameTex = usePunchedFrame(
-    "/textures/mirror-frame-arch.png",
-    ARCH_PUNCH.fx,
-    ARCH_PUNCH.fyApex,
-    ARCH_PUNCH.fyBottom,
-    ARCH_PUNCH.fySpring,
-  );
+  // 白大理石拱门（07-09 三轮：实体几何 + 雕饰线脚贴图）：门洞边界由几何定义，
+  // 原图直接贴前盖（无需抠窗/键控），开口实测值见 ARCH_M
+  const mirrorFrameTex = useOptionalTexture("/textures/mirror-frame-arch.png");
+  const archSolid = useMemo(() => makeArchSolidGeometry(), []);
   const cloudTex = useOptionalTexture("/textures/cloud-bank.png");
   // 天幕真图：gpt-image matte painting（程序化色晕画不出空气感），缺图回退 canvas 版
   const backdropImg = useOptionalTexture("/textures/gate-backdrop.png");
@@ -707,13 +748,17 @@ export function GateScene({
           镜框反射内容由场景光源承担 */}
       {mirrorFrameTex ? (
         <group position={[0, 0, -0.06]}>
-          {/* 大理石拱门框：拱窗=2×3 对齐镜心（y 按实测窗心补偿）；
-              镜面 2.4×3.3 超填于后，框带全覆盖杜绝露缝（拱肩为框体，天然盖住镜面上角）。
-              z=0.1（组内）→ 世界 0.04：必须在镜面(0)之前，框带才能压住超填镜缘；
-              拱形画界在 0.12 更前，推进穿框时盖框 ✓ */}
-          <mesh position={[0, ARCH_MESH_Y, 0.1]}>
-            <planeGeometry args={[ARCH_PLANE_W, ARCH_PLANE_H]} />
-            <meshBasicMaterial map={mirrorFrameTex} transparent depthWrite={false} />
+          {/* 大理石拱门实体：0.24 厚挤出体（组内 -0.02..0.22 → 世界 -0.08..0.16），
+              镜面（世界 z≈0）藏在门体厚度内，门洞内壁深度剔除超填镜缘——零露边；
+              前盖贴雕饰大理石图（画进去的光影），侧壁/内壁纯大理石吃场景光=立体 */}
+          <mesh geometry={archSolid} position={[0, 0, -0.02]}>
+            <meshBasicMaterial attach="material-0" map={mirrorFrameTex} />
+            <meshStandardMaterial
+              attach="material-1"
+              color="#d9d6cf"
+              roughness={0.55}
+              metalness={0.05}
+            />
           </mesh>
           {/* 辉光压暗：镜面隐去后这两层不能裸露成一块淡紫平板 */}
           <GlowPlane texture={glow} position={[0, 0, -0.02]} scale={[3.4, 4.4]} color={ACCENT_3} opacity={0.12} />
