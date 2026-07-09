@@ -1,8 +1,9 @@
 /**
- * 演示种子数据（Task 9）
- * 5 场精选示例梦境 + 跨梦模式元数据。
- * 梦境 1/2/3 设计为「水 + 负面情绪」跨梦模式，可触发潜意识报告演示。
- * 梦境 4/5 为对比组（飞翔-欢欣 / 坠落-恐惧），同为「空中」主题但情绪相反。
+ * 演示种子数据（Task 9 · 07-09 扩容至 9 条）
+ * 精选示例梦境 + 跨梦模式元数据。设计的跨梦模式：
+ * - 水 ×4（seed-1/2/3 负面 + seed-9 安然）：持续意象 + 情绪基调变化
+ * - 门 ×3（seed-2/6/8）：呼应「镜之门」产品主题的自指意象
+ * - 飞翔（欢欣）↔ 坠落（恐惧）对比组：同为「空中」主题但情绪相反
  */
 import type { Dream } from '@/lib/types';
 import { useDreamStore } from '@/store/useDreamStore';
@@ -10,8 +11,52 @@ import { useDreamStore } from '@/store/useDreamStore';
 const DAY = 86400000;
 const NOW = Date.now();
 
-/** 5 场精选示例梦境（id 固定 seed-1..seed-5，避免重复加载） */
+/** 精选示例梦境（id 固定 seed-N，避免重复加载） */
 export const SEED_DREAMS: Dream[] = [
+  {
+    id: 'seed-6',
+    createdAt: NOW - 9 * DAY,
+    rawText:
+      '我走在一片起风的麦田里，田中央立着一扇白色的门——没有墙，只有门。我绕到门后看，那里什么都没有；可当我推开门穿过去，眼前是一片安静的海。',
+    emotion: { word: '宁静', intensity: 0.72, tone: 'positive' },
+    aestheticPreset: 'Ethereal',
+    color: '#C9B8E8',
+    tags: ['门', '麦田', '海', '穿过'],
+    artifact: {
+      imageUrl: '/seeds-gen/seed-6.png',
+      imageSource: 'ai',
+      emotionAnalysis:
+        '无墙之门是梦境中罕见而优雅的"阈限"意象——门的意义不在隔断，而在跨越本身。绕到门后一无所有、穿过门却抵达海，揭示了一个温柔的悖论：转变不能被旁观或分析，只能被亲身经历。门后的海承接了此前梦境中反复出现的水意象，但这一次水是平静的——暗示梦者与某个长期的情绪主题正在达成和解。',
+      symbols: [
+        { name: '门', probability: 0.9, note: '阈限意象，转变只能亲历而非旁观' },
+        { name: '水', probability: 0.8, note: '门后安静的海，与水主题的和解' },
+        { name: '麦田', probability: 0.7, note: '风中原野，开阔而不确定的当下' },
+      ],
+      analysisSource: 'ai',
+    },
+  },
+  {
+    id: 'seed-7',
+    createdAt: NOW - 8 * DAY,
+    rawText:
+      '我在一座旧城的窄巷里被人追，看不清他的脸。巷子越跑越窄，两侧的墙几乎贴上肩膀。转过最后一个拐角，追我的人不见了，眼前是我小时候住过的院子，灯还亮着。',
+    emotion: { word: '恐惧', intensity: 0.78, tone: 'negative' },
+    aestheticPreset: 'Dark Fantasy',
+    color: '#6A0572',
+    tags: ['追逐', '窄巷', '无脸人', '老家'],
+    artifact: {
+      imageUrl: '/seeds-gen/seed-7.png',
+      imageSource: 'ai',
+      emotionAnalysis:
+        '追逐梦是最普遍的焦虑梦型之一，而"看不清脸的追逐者"通常不是外部威胁，而是被回避的自我议题——看不清，是因为不愿看清。巷子收窄映射着回避空间的耗尽：逃避的路越走越窄。结尾的转折意味深长——穷途处出现的不是追逐者，而是亮着灯的童年院落，暗示恐惧的尽头可能藏着被遗忘的安全感来源，追逐者想把梦者赶回的，或许正是某个需要重新面对的起点。',
+      symbols: [
+        { name: '追逐', probability: 0.92, note: '被回避的自我议题，无脸=不愿看清' },
+        { name: '窄巷', probability: 0.76, note: '回避空间的耗尽，退路收窄' },
+        { name: '家', probability: 0.74, note: '恐惧尽头的童年院落，被遗忘的安全感' },
+      ],
+      analysisSource: 'ai',
+    },
+  },
   {
     id: 'seed-1',
     createdAt: NOW - 6 * DAY,
@@ -52,6 +97,28 @@ export const SEED_DREAMS: Dream[] = [
         { name: '水', probability: 0.88, note: '暴雨象征情绪超载与外界压力' },
         { name: '门', probability: 0.82, note: '关闭的门映射支持缺位，开启的门是转机' },
         { name: '走廊', probability: 0.75, note: '过渡空间，处于困境与出口之间' },
+      ],
+      analysisSource: 'ai',
+    },
+  },
+  {
+    id: 'seed-8',
+    createdAt: NOW - 4 * DAY,
+    rawText:
+      '梦里有一座极高的图书馆，中间是一部旋转楼梯，每一层都只有一扇木门。我推开一扇，门里是落雪的冬天；再推开一扇，是蝉鸣的夏夜。我一直往上走，很想知道顶层那扇门的后面是什么。',
+    emotion: { word: '出神', intensity: 0.7, tone: 'neutral' },
+    aestheticPreset: 'Mystical',
+    color: '#5A189A',
+    tags: ['门', '图书馆', '楼梯', '季节'],
+    artifact: {
+      imageUrl: '/seeds-gen/seed-8.png',
+      imageSource: 'ai',
+      emotionAnalysis:
+        '图书馆是"内在知识库"的经典象征，旋转楼梯则是缓慢的、盘旋上升的自我探索。每层一扇门、门后是不同季节——门在这里是"可能性"的容器：每一次推开都是一次时间与心境的切换。持续向上、想看顶层的门，流露出一种安静而执着的好奇。值得注意的是"门"意象在近期梦境中反复出现（雨夜之门、麦田之门、季节之门），可能提示梦者正处于某个选择或转变的酝酿期。',
+      symbols: [
+        { name: '门', probability: 0.88, note: '可能性的容器，每次推开都是一次切换' },
+        { name: '楼梯', probability: 0.76, note: '盘旋上升的自我探索' },
+        { name: '图书馆', probability: 0.7, note: '内在知识库，记忆与经验的收藏' },
       ],
       analysisSource: 'ai',
     },
@@ -122,33 +189,33 @@ export const SEED_DREAMS: Dream[] = [
       analysisSource: 'ai',
     },
   },
-];
-
-/** 跨梦模式元数据（供潜意识报告演示读取） */
-export interface SeedPattern {
-  symbol: string;
-  count: number;
-  description: string;
-}
-
-export const SEED_PATTERNS: SeedPattern[] = [
   {
-    symbol: '水',
-    count: 3,
-    description:
-      '近期 3 个梦境都出现了水元素与负面情绪（焦虑/无力），可能提示持续的情绪压力源未被处理。',
-  },
-  {
-    symbol: '空中主题',
-    count: 2,
-    description:
-      '飞翔（欢欣）与坠落（恐惧）形成对比组，同为「空中」主题但情绪基调相反，反映心理状态的两极张力。',
+    id: 'seed-9',
+    createdAt: NOW - 0.5 * DAY,
+    rawText:
+      '我乘着一部玻璃电梯往深海里下沉。水压没有让我害怕，四周越来越暗，只有远处一点微光。一头鲸从电梯旁缓缓游过，眼睛很大，像是在看我。我心里异常安静。',
+    emotion: { word: '安然', intensity: 0.76, tone: 'neutral' },
+    aestheticPreset: 'Mystical',
+    color: '#5A189A',
+    tags: ['水', '深海', '鲸', '电梯'],
+    artifact: {
+      imageUrl: '/seeds-gen/seed-9.png',
+      imageSource: 'ai',
+      emotionAnalysis:
+        '这是一个意味深长的转折之梦。此前的水梦（上涨的海、暴雨、渗水）都伴随焦虑与无力，而这一次，梦者主动乘电梯下沉——不再抵抗水，而是有保护地（玻璃电梯）进入它的深处。深海即潜意识深层，鲸是其中缓慢而庞大的居民，它注视的目光温和而非威胁。整个梦的基调是"安静"：对照早前的水梦，这几乎是一次和解的仪式——梦者开始有能力靠近曾经淹没自己的东西。',
+      symbols: [
+        { name: '水', probability: 0.9, note: '深海即潜意识深层，从抵抗转为进入' },
+        { name: '鲸', probability: 0.8, note: '潜意识中庞大而温和的存在，注视而非威胁' },
+        { name: '电梯', probability: 0.68, note: '有保护的下潜，可控的深入' },
+      ],
+      analysisSource: 'ai',
+    },
   },
 ];
 
 /**
  * 将种子梦境加载到 store（按 id 去重，已存在则跳过）。
- * 供 GalleryPage 首次自动加载与 SeedDataPanel 手动加载复用。
+ * 供 WorldPage 首次自动加载/扩容追加迁移与 SeedDataPanel 手动加载复用。
  */
 export async function loadSeeds(): Promise<void> {
   const { dreams, addDream } = useDreamStore.getState();

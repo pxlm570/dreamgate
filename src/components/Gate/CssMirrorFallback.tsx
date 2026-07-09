@@ -1,6 +1,6 @@
 // CssMirrorFallback — CSS 降级版镜之门转场
 // WebGL 不可用 / 低端设备时使用：CSS 镜面 + framer-motion 16 碎片飞散 + 雾气渐变
-// 同样约 2 秒后调用 onComplete，由 GatePage 跳转 /gallery
+// 同样约 2 秒后调用 onComplete，由 WorldPage 切换 stage=corridor
 
 import { useEffect, useMemo } from "react";
 import { motion } from "framer-motion";

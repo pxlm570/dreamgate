@@ -5,14 +5,26 @@
  * （只在本地用 Key 跑一次，把结果打包进 public/）。含重试 / 跳过已存在 / 请求节流，
  * 以应对中转站的 524 超时。
  *
- * 用法：
- *   OPENAI_API_KEY=sk-... OPENAI_BASE_URL=https://www.bytecatcode.org \
- *   OPENAI_IMAGE_MODEL=gpt-image-2 node scripts/gen-seed-images.mjs
+ * 用法：node scripts/gen-seed-images.mjs   （自动读取 .env 的 OPENAI_* 配置，也可用环境变量覆盖）
  *
  * 生成到 public/seeds-gen/seed-N.png，并打印需写回 src/data/seedDreams.ts 的 imageUrl 映射。
  */
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+
+// 手动解析 .env（node 不自动加载；与 gen-scene-textures.mjs 一致）
+function loadDotEnv() {
+  try {
+    const txt = readFileSync(".env", "utf8");
+    for (const line of txt.split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.+?)\s*$/);
+      if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+    }
+  } catch {
+    /* 无 .env 则仅用进程环境 */
+  }
+}
+loadDotEnv();
 
 const KEY = process.env.OPENAI_API_KEY;
 const MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
@@ -45,6 +57,11 @@ const DREAMS = [
   { id: "seed-3", preset: "Mystical", scene: "water seeping through the cracks of a dim room's floor, slowly flooding, quiet helplessness, faint reflections on the rising water" },
   { id: "seed-4", preset: "Ethereal", scene: "a person floating and flying freely above a glittering night city, wind and weightless lightness, a feeling of liberation" },
   { id: "seed-5", preset: "Dark Fantasy", scene: "falling from a tall tower as the staircase vanishes, rushing wind, grasping at nothing, vertigo, the moment before impact" },
+  // —— 扩容批（07-09）：门 ×2 呼应「镜之门」自指主题；水再 +1 强化水模式；追逐经典梦 ——
+  { id: "seed-6", preset: "Ethereal", scene: "a single white door standing alone in a windswept wheat field with no walls around it, the door slightly open revealing a calm sea behind it, golden ears of wheat bending in the wind" },
+  { id: "seed-7", preset: "Dark Fantasy", scene: "a narrow alley of an old european town at night, being chased by a faceless figure, walls closing in, and around the last corner a warm lit childhood courtyard appears" },
+  { id: "seed-8", preset: "Mystical", scene: "an endless spiral staircase inside a vast ancient library, each floor has one wooden door, one open door revealing falling snow, another revealing a summer night, warm lamplight on old books" },
+  { id: "seed-9", preset: "Mystical", scene: "a glass elevator descending into the deep dark sea, a giant whale swimming slowly past with a large gentle eye, faint rays of light from above, serene and quiet" },
 ];
 
 async function tryGen(d) {

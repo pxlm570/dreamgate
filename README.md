@@ -33,14 +33,15 @@
 
 | # | 功能 | 说明 | 降级策略 |
 |---|------|------|----------|
-| 1 | **镜之门开场** | Three.js 碎镜传送门转场，镜面碎裂 + 雾气扩散 + 相机推进 | WebGL 不可用 → CSS 碎片转场 |
+| 1 | **镜之门开场** | 白大理石拱门立于镜湖，碎镜后门内即真实走廊——相机推过门洞直入美术馆（单一持久 Canvas，零遮罩真连续转场） | WebGL 不可用 → CSS 拱门转场 |
 | 2 | **低摩擦梦境录入** | 文字 / 语音 60 秒捕获 + 情绪/颜色/标签元数据 | 语音不支持 → 隐藏按钮 |
-| 3 | **AI 梦境藏品生成** | Pollinations 统一美学图像 + Edge AI 情绪/符号解析 | 图像失败 → 种子库占位；解析失败 → 规则降级 |
-| 4 | **3D 走廊画廊** | R3F 滚动驱动相机漂移 + 梦境门 + 情绪色光 | 移动端 → 2.5D 视差画廊 |
-| 5 | **梦境卡片分享** | 3D 可定制卡片编辑器 + html-to-image 导出 + 分享链接 | 工期不达标 → 3 套预设模板 |
-| 6 | **情绪追踪** | streak 连续天数 + 30 天热力图 + 4 维度分布 | — |
-| 7 | **隐私本地优先** | IndexedDB 存储 + AI 显式同意 + JSON 一键导出 | — |
-| 8 | **演示种子数据** | 5 个精选示例梦境（含跨梦模式：水 ×3 + 飞翔/坠落对比） | 可一键清空 |
+| 3 | **AI 梦境藏品生成** | gpt-image / Pollinations 统一美学油画 + 大模型情绪/符号解析，暗房显影仪式呈现 | 图像失败 → 种子库占位；解析失败 → 规则降级 |
+| 4 | **3D 走廊画廊** | 逐画驻足运镜 + 美术馆式简介牌 + 入画俯冲进详情 + 跨梦模式识别 | 持续掉帧 → 2.5D 视差画廊 |
+| 5 | **梦境卡片分享** | 卡片导出 + 只读分享链接（梦境编码进 URL，接收端无需安装） | — |
+| 6 | **潜意识报告** | 跨梦模式识别（重复意象/关联情绪/对比张力）+ streak + 热力图 + 维度分布 | — |
+| 7 | **共享梦池** | 匿名漂流瓶 + 符号/情绪相似度共鸣 + 本地投递（概念演示 · 数据仅存本机） | — |
+| 8 | **隐私本地优先** | IndexedDB 存储 + AI 显式同意 + JSON 一键导出 | — |
+| 9 | **演示种子数据** | 9 个精选示例梦境（跨梦模式：水 ×4 走向和解 + 门 ×3 + 飞翔/坠落对比） | 可一键清空 |
 
 ---
 
@@ -57,7 +58,7 @@
 | 状态 | Zustand | 5.0 | 轻量 + 无 Provider + IndexedDB 同步简单 |
 | 存储 | IndexedDB (idb) | 8.0 | 纯前端 + 大容量 + 结构化存储 |
 | 图像导出 | html-to-image | 1.11 | DOM 转 PNG + 分享卡导出 |
-| AI 图像 | Pollinations.ai flux | — | 零成本 + 无 Key + URL 直连 |
+| AI 图像 | gpt-image（可选）→ Pollinations.ai flux | — | 前者需部署代理+Key，后者零成本无 Key |
 | AI 解析 | EdgeOne Edge AI (DeepSeek-V3) | — | 零 Key + OpenAI 兼容 + 50 次/天 |
 
 ---
@@ -113,25 +114,25 @@ npm run preview
 dreamgate/
 ├── src/
 │   ├── components/
-│   │   ├── Gate/           # 镜之门 3D 开场（MirrorGate + 碎镜转场）
+│   │   ├── Gate/           # 镜之门场景（拱门+镜湖+碎镜时间线，GateScene 可挂进单世界 Canvas）
 │   │   ├── Record/         # 梦境录入（表单 + 语音 + 情绪选择器）
-│   │   ├── Generation/     # AI 藏品生成（编排 + 同意 + 渐进式呈现）
-│   │   ├── Gallery/        # 3D 走廊画廊（CorridorScene + DreamDoor + 2.5D 降级）
+│   │   ├── Generation/     # AI 藏品生成（编排 + 同意 + 暗房显影仪式）
+│   │   ├── Gallery/        # 3D 走廊场景（CorridorWorld + DreamDoor 简介牌 + 2.5D 降级）
 │   │   ├── Share/          # 卡片分享（3D 编辑器 + 导出 + 分享链接）
-│   │   ├── Tracking/       # 情绪追踪（streak + 热力图 + 分布图）
+│   │   ├── Tracking/       # 情绪追踪 + 跨梦模式（streak + 热力图 + CrossDreamInsights）
 │   │   ├── Privacy/        # 隐私与导出（免责页脚 + modal + JSON 导出）
 │   │   ├── SeedData/       # 演示种子数据面板
 │   │   ├── Atmosphere/     # 氛围层（雾 + 粒子 + 颗粒overlay）
 │   │   └── ui/             # 基础 UI（Button + Backdrop + Typography）
-│   ├── lib/                # 纯逻辑层（types/emotions/symbols/ai/db/ruleParser...）
+│   ├── lib/                # 纯逻辑层（types/emotions/symbols/ai/db/ruleParser/pool...）
 │   ├── store/              # Zustand 全局状态（useDreamStore）
-│   ├── pages/              # 7 个路由页面
-│   ├── data/               # 种子梦境数据（5 个示例 + 跨梦模式）
+│   ├── pages/              # 路由页面（WorldPage 单一持久 Canvas 承载"/"与"/gallery"）
+│   ├── data/               # 种子梦境数据（9 个示例 + 跨梦模式；poolDreams 梦池演示数据）
 │   └── App.tsx             # HashRouter 路由根
 ├── edge-functions/api/     # EdgeOne 边缘函数（llm.ts + ping.ts）
 ├── api/llm.ts              # Vercel 备用边缘函数（SiliconFlow）
-├── public/seeds/           # 20 张 SVG 种子占位图（4 预设 × 5 情绪）
-├── scripts/gen-seeds.mjs   # SVG 种子图生成脚本
+├── public/seeds-gen/       # gpt-image 生成的高清种子梦境油画
+├── public/textures/        # 场景实体材质（拱门/墙面/地板/天花板/氛围图）
 ├── docs/                   # 开发文档（部署指南 + 开发记录 + 报名文案）
 └── edgeone.json            # EdgeOne Pages 构建配置
 ```
@@ -140,8 +141,9 @@ dreamgate/
 
 1. **纯逻辑层与 UI 层分离** — `src/lib/*` 无 React 依赖，确保逻辑稳定可测
 2. **Zustand + IndexedDB 自动同步** — UI 只操作 store，store 内部写 IndexedDB
-3. **AI 接入三层兜底** — Pollinations/Edge AI → 种子库/ruleParser → 默认值
+3. **AI 接入三层兜底** — gpt-image/Pollinations → 种子库/ruleParser → 默认值
 4. **降级开关双层设计** — 编译期 `VITE_DEGRADE_*` + 运行时不可逆触发
+5. **单一持久 Canvas** — 镜之门与 3D 走廊共享同一 WebGL 上下文，转场是场景组显隐+相机接力，无上下文重建
 
 ---
 

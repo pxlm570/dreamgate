@@ -1,5 +1,5 @@
-// Gallery 页面级 hooks — 从 GalleryPage 拆出（融合单世界 Step1 顺带的代码健康重构）
-// ① useSeedBootstrap：空画廊首次自动播种 + 老用户种子藏品图升级迁移
+// Gallery 页面级 hooks（融合单世界 Step1 从原 GalleryPage 拆出的代码健康重构）
+// ① useSeedBootstrap：空画廊首次自动播种 + 老用户种子藏品图升级迁移 + 种子扩容追加迁移
 // ② useStopNavigation：kimi 式逐画驻足（一格滚轮 = 运镜到下一幅画前站定）
 
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
@@ -19,24 +19,51 @@ export function useSeedBootstrap(): void {
   const loaded = useDreamStore((s) => s.loaded);
   const meta = useDreamStore((s) => s.meta);
   const updateDream = useDreamStore((s) => s.updateDream);
+  // 迁移去重锁：addDream 只是无脑 concat 内存数组，不按 id 去重；loadSeeds 内部
+  // 的 `existing` 集合只在调用起始快照一次。若不加锁，effect 会在每次 addDream
+  // 触发的 dreams 引用变化时重新触发，多个并发 loadSeeds() 各自基于过期快照
+  // 添加同一批缺失种子，导致数组里出现重复 id（React key 冲突）。
+  const migratingRef = useRef(false);
 
   useEffect(() => {
-    if (!loaded || dreams.length > 0 || !meta.onboarded) return;
-    if (localStorage.getItem(SEEDS_AUTO_LOADED_KEY) === "true") return;
-    let cancelled = false;
-    (async () => {
-      await loadSeeds();
-      if (cancelled) return;
-      try {
-        localStorage.setItem(SEEDS_AUTO_LOADED_KEY, "true");
-      } catch {
-        /* ignore quota errors */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [loaded, dreams.length, meta.onboarded]);
+    if (!loaded || !meta.onboarded) return;
+    const alreadyAuto = localStorage.getItem(SEEDS_AUTO_LOADED_KEY) === "true";
+    if (dreams.length === 0) {
+      // 首次进入空画廊自动播种（仅一次，用户清空后不再自动加载）
+      if (alreadyAuto || migratingRef.current) return;
+      migratingRef.current = true;
+      let cancelled = false;
+      (async () => {
+        await loadSeeds();
+        if (cancelled) return;
+        try {
+          localStorage.setItem(SEEDS_AUTO_LOADED_KEY, "true");
+        } catch {
+          /* ignore quota errors */
+        }
+      })().finally(() => {
+        migratingRef.current = false;
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+    // 扩容追加迁移（07-09 种子 5→9 条）：曾自动播种、且用户仍保留着种子
+    // （删过种子的用户不打扰）→ 补齐缺失的新种子；loadSeeds 按 id 去重
+    if (
+      alreadyAuto &&
+      !migratingRef.current &&
+      dreams.some((d) => d.id.startsWith("seed-")) &&
+      SEED_DREAMS.some((s) => !dreams.some((d) => d.id === s.id))
+    ) {
+      migratingRef.current = true;
+      loadSeeds()
+        .catch((err) => console.error("[DreamGate] 种子扩容追加失败:", err))
+        .finally(() => {
+          migratingRef.current = false;
+        });
+    }
+  }, [loaded, dreams, meta.onboarded]);
 
   useEffect(() => {
     if (!loaded) return;

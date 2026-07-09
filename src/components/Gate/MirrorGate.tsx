@@ -1,7 +1,7 @@
 // MirrorGate — 3D 镜之门场景（@react-three/fiber）
-// 组成：雾效 + 镜面（MeshReflectorMaterial 反射）+ 镜框 + 柔光晕 + 微光粒子 + 碎片
-// 触发时：GSAP timeline 隐去镜面 → 碎片飞散 → 雾气扩散 → 相机推进穿过镜框
-// 约 2s 后调用 onComplete，由 GatePage 跳转 /gallery
+// 组成：雾效 + 镜面（MeshReflectorMaterial 反射）+ 大理石拱门 + 柔光晕 + 微光粒子 + 碎片
+// 触发时：GSAP timeline 隐去镜面 → 碎片飞散 → 相机加速推过门洞（真连续穿门）
+// 约 2.3s 后调用 onComplete，由 WorldPage 切换 stage=corridor（layout route 不重挂）
 
 import { useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";

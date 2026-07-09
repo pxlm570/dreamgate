@@ -55,7 +55,7 @@ export function SeedDataPanel({ onLoaded, onCleared }: SeedDataPanelProps) {
           size="md"
           onClick={handleLoad}
           disabled={loading || hasSeeds}
-          title={hasSeeds ? "示例梦境已加载" : "加载 5 场精选示例梦境"}
+          title={hasSeeds ? "示例梦境已加载" : `加载 ${SEED_DREAMS.length} 场精选示例梦境`}
         >
           {loading ? (
             <Loader2 size={16} className="animate-spin" />
@@ -76,7 +76,7 @@ export function SeedDataPanel({ onLoaded, onCleared }: SeedDataPanelProps) {
         </Button>
       </div>
       <Caption as="p" className="text-[11px] text-dreamgate-text-muted">
-        5 场精选示例 · 含「水 + 负面情绪」跨梦模式演示
+        {SEED_DREAMS.length} 场精选示例 · 含「水」「门」跨梦模式 + 飞翔/坠落对比
       </Caption>
     </motion.div>
   );

@@ -72,7 +72,8 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
             !readOnly && "hover:[transform:rotateY(0deg)_rotateX(0deg)]",
           )}
         >
-          {/* 上半：图像 */}
+          {/* 上半：图像——与走廊画框同一套「画嵌进框」语言：四边内阴影给出进深，
+              直接贴图会显平板屏幕感（呼应 DreamDoor 的 innerShadow 处理） */}
           <div className="relative h-1/2 w-full overflow-hidden">
             {artifact.imageUrl ? (
               <img
@@ -86,6 +87,10 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
                 <ImageIcon size={40} />
               </div>
             )}
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{ boxShadow: "inset 0 0 32px 6px rgba(0,0,0,0.45)" }}
+            />
             {/* 上下半过渡渐变 */}
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-dreamgate-deep/90 to-transparent" />
           </div>

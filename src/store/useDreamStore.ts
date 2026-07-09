@@ -74,7 +74,7 @@ export const useDreamStore = create<DreamStoreState>((set, get) => ({
       });
     } catch (err) {
       // IndexedDB 不可用：进入降级（空数据 + 默认 meta），但务必置 loaded=true，
-      // 否则 GalleryPage 等会卡在 `if (!loaded)` 永久白屏（隐身窗口即翻车）。
+      // 否则 WorldPage 等会卡在 `if (!loaded)` 永久白屏（隐身窗口即翻车）。
       console.error('[DreamGate] loadDreams failed (IndexedDB 不可用?):', err);
       set({
         dreams: [],
