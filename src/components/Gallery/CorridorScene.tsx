@@ -432,7 +432,12 @@ function CameraRig({
   return null;
 }
 
-/** 帧率采样：预热后采样 ~2s，平均帧率过低则触发降级回调（卡顿自动降 2.5D，保交付） */
+/**
+ * 帧率采样：预热后采样，平均帧率确实过低才触发降级回调（卡顿自动降 2.5D，保交付）。
+ * 参数必须保守（用户反馈「经常自动跳 2.5D」的根因就是旧参数太激进）：
+ * - 预热 4s：穿门抵达后的纹理解码/入场推镜/字体绘制全是掉帧高峰，采样必须避开
+ * - 采样 3s + 阈值 22fps：只对「持续真卡」降级，瞬时抖动不触发（降级不可逆，宁纵勿枉）
+ */
 function FpsSampler({ onLow }: { onLow?: () => void }) {
   const ref = useRef({ warmUntil: 0, sampleStart: 0, frames: 0, fired: false });
   useFrame(() => {
@@ -440,7 +445,7 @@ function FpsSampler({ onLow }: { onLow?: () => void }) {
     if (s.fired || !onLow) return;
     const now = performance.now();
     if (s.warmUntil === 0) {
-      s.warmUntil = now + 900; // 首帧：设预热截止，避开加载抖动
+      s.warmUntil = now + 4000; // 首帧：设预热截止，避开加载/入场抖动
       return;
     }
     if (now < s.warmUntil) return;
@@ -451,10 +456,10 @@ function FpsSampler({ onLow }: { onLow?: () => void }) {
     }
     s.frames += 1;
     const elapsed = now - s.sampleStart;
-    if (elapsed >= 2000) {
+    if (elapsed >= 3000) {
       s.fired = true;
       const fps = (s.frames / elapsed) * 1000;
-      if (fps < 35) onLow();
+      if (fps < 22) onLow();
     }
   });
   return null;
@@ -564,7 +569,7 @@ export function CorridorWorld({
             position={[x, 0, z]}
             rotationY={rotationY}
             onClick={onDoorClick}
-            hideLabel={!!focusedId}
+            index={i}
             highlight={focusedId === d.id}
             glowTex={glowTex}
           />

@@ -16,7 +16,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import { AnimatePresence, motion } from "framer-motion";
-import { Moon, Plus, ArrowRight, X } from "lucide-react";
+import { Moon, Plus } from "lucide-react";
 import { useDreamStore } from "@/store/useDreamStore";
 import { useDegradation, triggerDegradation } from "@/lib/degradation";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
@@ -201,6 +201,9 @@ export default function WorldPage() {
   }, [stage, gateMode, advance, trigger]);
 
   // —— 画廊模式与交互 ——
+  // 桌面默认一律 3D（用户定稿 07-09）：只有 WebGL 不可用 / 移动端窄屏 /
+  // 运行时实测持续掉帧（FpsSampler，参数已保守化）才降 2.5D。
+  // 曾经的 hardwareConcurrency<4 预判过于激进（核数≠GPU 能力），已移除。
   const defaultGalleryMode: GalleryMode = useMemo(() => {
     let gl = false;
     try {
@@ -209,7 +212,7 @@ export default function WorldPage() {
     } catch {
       /* noop */
     }
-    if (!gl || window.innerWidth < 768 || (navigator.hardwareConcurrency ?? 8) < 4) return "2.5d";
+    if (!gl || window.innerWidth < 768) return "2.5d";
     if (degradation.mobile2_5D || degradation.desktop3D) return "2.5d";
     return "3d";
   }, [degradation.mobile2_5D, degradation.desktop3D]);
@@ -229,39 +232,25 @@ export default function WorldPage() {
     setSelectedDream(d.id);
     navigate(`/dream/${d.id}`);
   };
-  const enterDream = (d: Dream) => {
-    if (galleryMode === "3d" && !reduceMotion && focused?.id === d.id) {
-      if (diving) return;
+  // 点击画作或简介牌 → 直接入画（相机俯冲 + 淡出）→ 详情页。
+  // 美术馆式简介牌常驻墙上，画作信息一直可读——不再需要「先驻足看展签」
+  // 的两步交互（用户定稿 07-09）；focused 仅作为俯冲相机的目标保留
+  const handleSelect = (d: Dream) => {
+    if (diving) return;
+    if (galleryMode === "3d" && !reduceMotion) {
+      setFocused(d);
       setDiving(true);
       window.setTimeout(() => gotoDream(d), 820);
       return;
     }
     gotoDream(d);
   };
-  const handleSelect = (d: Dream) => {
-    if (diving) return;
-    if (galleryMode === "3d" && focused?.id !== d.id) {
-      setFocused(d);
-      return;
-    }
-    enterDream(d);
-  };
-
-  // ESC 退出聚焦（入画途中不可中断）
-  useEffect(() => {
-    if (!focused || diving) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setFocused(null);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [focused, diving]);
 
   const recentCount = Math.min(dreams.length, 20);
   const stop = useStopNavigation({
     enabled: stage === "corridor" && galleryMode === "3d",
     recentCount,
-    paused: !!focused || diving,
+    paused: diving,
     scrollRef,
   });
 
@@ -278,11 +267,6 @@ export default function WorldPage() {
 
   const recent = dreams.slice(-20).reverse();
   const accentColor = getEmotionByWord(recent[0]?.emotion.word ?? "")?.color ?? "#c9b8e8";
-  const focusColor = focused
-    ? (getEmotionByWord(focused.emotion.word)?.color ?? "#c9b8e8")
-    : "#c9b8e8";
-  const focusIdx = focused ? recent.findIndex((d) => d.id === focused.id) : -1;
-  const focusSide = focusIdx >= 0 && focusIdx % 2 === 0 ? -1 : 1;
 
   const galleryHeader = (
     <header className="pointer-events-none fixed inset-x-0 top-0 z-20 px-5 py-4 sm:px-8">
@@ -353,9 +337,6 @@ export default function WorldPage() {
             dpr={typeof window !== "undefined" && window.innerWidth < 768 ? [1, 1.2] : [1, 1.5]}
             gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
             style={{ position: "absolute", inset: 0 }}
-            onPointerMissed={() => {
-              if (stage === "corridor" && !diving) setFocused(null);
-            }}
           >
             {/* 氛围/后处理按「视觉阶段」切换：碎裂白闪起（crossing）即用走廊值 */}
             <WorldAtmosphere
@@ -423,75 +404,15 @@ export default function WorldPage() {
           {!withShaderFog && (
             <Fog className="pointer-events-none fixed inset-0 z-[1]" intensity={0.5} color={accentColor} />
           )}
-          {!focused && (
+          {!diving && (
             <div className="pointer-events-none fixed inset-x-0 bottom-6 z-20 flex justify-center">
               <Caption as="div" className="animate-pulse-glow rounded-full border border-white/10 bg-dreamgate-elevated/40 px-4 py-1.5 text-[11px] uppercase tracking-widest backdrop-blur-md">
-                滚动 · 逐画前行{stop > 0 ? ` · ${Math.min(stop + 1, recentCount)} / ${recentCount}` : ""} · 点击画作驻足
+                滚动 · 逐画前行{stop > 0 ? ` · ${Math.min(stop + 1, recentCount)} / ${recentCount}` : ""} · 点击画作或简介 · 入画
               </Caption>
             </div>
           )}
-          {/* 聚焦展签：编辑式侧栏——画作偏一侧，展签占对侧留白，左右交替 */}
-          <AnimatePresence>
-            {focused && !diving && (
-              <motion.aside
-                key={focused.id}
-                initial={{ opacity: 0, x: focusSide === -1 ? -30 : 30, y: "-50%" }}
-                animate={{ opacity: 1, x: 0, y: "-50%" }}
-                exit={{ opacity: 0, x: focusSide === -1 ? -18 : 18, y: "-50%" }}
-                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
-                className={`pointer-events-none fixed top-1/2 z-20 w-[21rem] max-w-[78vw] ${
-                  focusSide === -1 ? "left-6 md:left-16" : "right-6 md:right-16"
-                }`}
-              >
-                <div
-                  className={`pointer-events-auto flex flex-col ${
-                    focusSide === -1 ? "items-start text-left" : "items-end text-right"
-                  }`}
-                >
-                  <Caption as="div" className="font-mono text-[10px] tracking-[0.42em]">
-                    N°{String(focusIdx + 1).padStart(2, "0")} ·{" "}
-                    {new Date(focused.createdAt).toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" })}
-                  </Caption>
-                  <div className={`mt-4 flex items-center gap-2.5 ${focusSide === 1 ? "flex-row-reverse" : ""}`}>
-                    <span
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ background: focusColor, boxShadow: `0 0 12px ${focusColor}` }}
-                    />
-                    <span className="font-mono text-xs tracking-[0.2em]" style={{ color: focusColor }}>
-                      {focused.emotion.word}
-                    </span>
-                  </div>
-                  <p
-                    className="mt-5 line-clamp-4 font-display text-[1.55rem] leading-snug text-dreamgate-text-primary md:text-[1.8rem]"
-                    style={{ textShadow: "0 2px 24px rgba(0,0,0,0.85)" }}
-                  >
-                    {focused.rawText}
-                  </p>
-                  <div
-                    className="mt-6 h-px w-16"
-                    style={{ background: `linear-gradient(${focusSide === -1 ? "90deg" : "270deg"}, ${focusColor}88, transparent)` }}
-                  />
-                  <div className={`mt-7 flex items-center gap-4 ${focusSide === 1 ? "flex-row-reverse" : ""}`}>
-                    <Button variant="ethereal" size="sm" onClick={() => enterDream(focused)}>
-                      入画 · 步入梦境
-                      <ArrowRight size={14} />
-                    </Button>
-                    <button
-                      type="button"
-                      aria-label="返回走廊"
-                      onClick={() => setFocused(null)}
-                      className="rounded-full border border-white/10 p-1.5 text-dreamgate-text-muted transition-colors hover:text-dreamgate-text-primary"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                  <Caption as="div" className="mt-5 text-[10px]">
-                    再次点击画作亦可入画 · ESC 返回
-                  </Caption>
-                </div>
-              </motion.aside>
-            )}
-          </AnimatePresence>
+          {/* 画作信息由墙上的美术馆式简介牌承载（DreamDoor 内 3D 展牌），
+              点画作或简介即直接入画——旧的两步聚焦展签已退役（用户定稿 07-09） */}
           {/* 入画淡出遮罩：相机俯冲的同时画面沉入黑暗——「穿过画布」的一瞬 */}
           <AnimatePresence>
             {diving && (
