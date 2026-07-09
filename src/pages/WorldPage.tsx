@@ -1,13 +1,15 @@
 // WorldPage — 单世界页面：镜之门与 3D 走廊共享同一个持久 Canvas。
 // 挂为 layout route（"/" 与 "/gallery" 的父级），路由在两者间切换时本组件不重挂——
-// 这是转场卡顿的根治：没有 WebGL 上下文销毁/重建，没有纹理重新上传，
-// 「转场」只是场景组 visible 翻转 + 相机接力（隐形剪辑藏在满幅静止帧后）。
+// 这是转场卡顿的根治：没有 WebGL 上下文销毁/重建，没有纹理重新上传。
+//
+// 真连续穿门（无遮罩、无静帧）：门立在走廊门槛前（GATE_ORIGIN_Z），
+// 碎裂白闪瞬间（crossing）门内换成真实走廊——走廊显形、雾切走廊值、镜湖环境隐去；
+// 相机加速推过门洞（终点=走廊相机起点），onComplete → navigate('/gallery')，
+// CameraRig 接力（intro 自适应零跳变）。「穿过门就走进了美术馆」。
 //
 // stage 状态机（由 URL 派生）：
 //   /         → stage=gate    门场景可见、门相机激活；走廊隐形挂载（GPU 预热）
 //   /gallery  → stage=corridor 走廊可见、CameraRig 接管；门场景隐形保活（回退零卡顿）
-// 碎镜三拍播完（onComplete）→ navigate('/gallery')，layout 不重挂，
-// DOM 静帧（MatchCutReveal 同图接帧）盖住场景切换的一瞬。
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -20,7 +22,7 @@ import { useDegradation, triggerDegradation } from "@/lib/degradation";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { getEmotionByWord } from "@/lib/emotions";
 import { Fog } from "@/components/Atmosphere";
-import { Button, Display, Caption, EntranceVeil, MatchCutReveal } from "@/components/ui";
+import { Button, Display, Caption, EntranceVeil } from "@/components/ui";
 import { GateScene, GateOverlay, CssMirrorFallback, GATE_ATMOSPHERE } from "@/components/Gate";
 import {
   CorridorWorld,
@@ -34,6 +36,8 @@ import { useSeedBootstrap, useStopNavigation } from "@/components/Gallery/hooks"
 import type { Dream } from "@/lib/types";
 
 const STORAGE_KEY = "dg-gallery-mode";
+/** 门的世界 z 原点：门立在走廊门槛前，推进终点(originZ-0.5)≈走廊相机起点(z=4)，接力零跳变 */
+const GATE_ORIGIN_Z = 4.5;
 
 type Stage = "gate" | "corridor";
 type GatePhase = "idle" | "triggered" | "done";
@@ -125,8 +129,9 @@ export default function WorldPage() {
   });
   const [focused, setFocused] = useState<Dream | null>(null);
   const [diving, setDiving] = useState(false);
-  // 是否由碎镜转场进入走廊（决定揭幕用同图接帧还是深色幕布）
-  const [fromGate, setFromGate] = useState(false);
+  // 穿门中间态：碎裂白闪瞬间置 true——走廊显形、雾/后处理切走廊值、镜湖环境隐去。
+  // 真连续的关键：从这一刻起门内就是真实走廊，相机推进穿门，无任何遮罩。
+  const [crossing, setCrossing] = useState(false);
 
   useSeedBootstrap();
 
@@ -139,7 +144,7 @@ export default function WorldPage() {
     if (stage === "gate" && phaseRef.current === "done") {
       setPhase("idle");
       setAct(0);
-      setFromGate(false);
+      setCrossing(false);
     }
   }, [stage]);
 
@@ -162,12 +167,16 @@ export default function WorldPage() {
     },
     [trigger],
   );
-  // 三拍播完 → 一次性切走廊路由（layout 不重挂；MatchCutReveal 同图盖住场景切换帧）。
+  // 碎裂白闪瞬间（门时间线 0.1s 回调）：门内换成真走廊——走廊显形、
+  // 雾/后处理切走廊值、镜湖环境（天幕/湖面/云堤）隐去，全部藏进白闪。
+  // 必须是 useCallback 稳定引用：它在门的触发 effect 依赖里，抖动会 kill 时间线
+  const handleShatter = useCallback(() => setCrossing(true), []);
+  // 推进穿门完成 → 一次性切走廊路由（layout 不重挂，相机已立在走廊入口，
+  // CameraRig 接力 intro 自适应零跳变——无遮罩、无静帧，真连续）。
   // 注意必须是一次性调用而非「phase=done ⇒ navigate」的持续 effect 规则——
   // 后者会在浏览器回退到门的瞬间（phase 尚未重置）把路由又顶回走廊
   const handleComplete = useCallback(() => {
     setPhase("done");
-    setFromGate(true);
     navigate("/gallery");
   }, [navigate]);
 
@@ -348,7 +357,12 @@ export default function WorldPage() {
               if (stage === "corridor" && !diving) setFocused(null);
             }}
           >
-            <WorldAtmosphere stage={stage} dreams={dreams} withShaderFog={withShaderFog} />
+            {/* 氛围/后处理按「视觉阶段」切换：碎裂白闪起（crossing）即用走廊值 */}
+            <WorldAtmosphere
+              stage={crossing || stage === "corridor" ? "corridor" : "gate"}
+              dreams={dreams}
+              withShaderFog={withShaderFog}
+            />
             <GateScene
               standalone={false}
               visible={stage === "gate"}
@@ -356,11 +370,14 @@ export default function WorldPage() {
               triggering={stage === "gate" && phase === "triggered"}
               onComplete={handleComplete}
               act={act}
+              originZ={GATE_ORIGIN_Z}
+              hideEnvirons={crossing}
+              onShatter={handleShatter}
             />
             {corridorMounted && (
               <CorridorWorld
                 standalone={false}
-                visible={stage === "corridor"}
+                visible={crossing || stage === "corridor"}
                 cameraEnabled={stage === "corridor"}
                 dreams={dreams}
                 onDoorClick={handleSelect}
@@ -372,7 +389,7 @@ export default function WorldPage() {
                 diving={diving}
               />
             )}
-            <WorldEffects stage={stage} />
+            <WorldEffects stage={crossing || stage === "corridor" ? "corridor" : "gate"} />
           </Canvas>
         </div>
       )}
@@ -396,9 +413,9 @@ export default function WorldPage() {
       )}
       {stage === "corridor" && loaded && dreams.length > 0 && galleryMode === "3d" && (
         <>
-          {/* 入场揭幕：来自镜之门 → 同图接帧（此时只是场景组翻转，无上下文重建）；
-              直接深链 → 深色幕布 */}
-          {fromGate ? <MatchCutReveal /> : <EntranceVeil />}
+          {/* 入场揭幕：穿门而来（crossing）零遮罩——相机本来就已走进走廊，真连续；
+              直接深链才盖深色幕布 */}
+          {!crossing && <EntranceVeil />}
           {galleryHeader}
           {a11yList}
           {!withShaderFog && (

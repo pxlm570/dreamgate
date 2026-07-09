@@ -364,23 +364,33 @@ function CameraRig({
   // 「像推开大门走进来」而非黑屏后原地出现
   const introRef = useRef(reduceMotion ? 0 : 6);
   useEffect(() => {
-    // 相机接力（单世界隐形剪辑的另一半）：挂载即把相机瞬移到走廊门外起点并
-    // 恢复走廊视角参数（fov 55、归零 x/y——门场景推进后相机可能带残余偏移），
-    // 随后每帧向内 damp（否则会先倒退到起点再前进）
-    const cam = camera as THREE.PerspectiveCamera;
-    if (cam.isPerspectiveCamera && cam.fov !== 55) {
-      cam.fov = 55;
-      cam.updateProjectionMatrix();
-    }
+    // 相机接力（真连续穿门）：接管时不瞬移——intro 取「相机当前位置与走廊起点的差」：
+    //   · 穿门而来：相机已被门的推进送到 z≈startZ（门槛内），intro≈0，零跳变直接续走
+    //   · 深链/直达：相机还在 Canvas 初始位（z≈6），intro≈2，仍有一段「推门而入」滑行
+    // fov 不在此瞬切：交给 useFrame 逐帧 damp（50→55 的缓慢变焦，微妙的入廊呼吸感）
     camera.position.x = 0;
     camera.position.y = 0;
-    if (!reduceMotion) camera.position.z = startZ + introRef.current;
+    if (!reduceMotion) {
+      introRef.current = Math.min(6, Math.max(0, camera.position.z - startZ));
+      camera.position.z = startZ + introRef.current;
+    } else {
+      const cam = camera as THREE.PerspectiveCamera;
+      cam.fov = 55;
+      cam.updateProjectionMatrix();
+      introRef.current = 0;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // 注：平滑一律用 damp（帧率无关的指数衰减）。固定系数 lerp 在帧率波动时
   // 平滑量逐帧不同（重场景帧率不稳），叠加 Lenis 自身平滑即产生肉眼可见的滚动抖动。
   useFrame((state, delta) => {
     const dt = Math.min(delta, 0.05); // 掐掉超长帧尖峰，防跳变
+    // fov 渐变焦：从门的 50 缓慢张到走廊的 55（穿门后视野徐徐展开，胜过瞬切）
+    const cam = camera as THREE.PerspectiveCamera;
+    if (cam.isPerspectiveCamera && Math.abs(cam.fov - 55) > 0.01) {
+      cam.fov = THREE.MathUtils.damp(cam.fov, 55, 2.2, dt);
+      cam.updateProjectionMatrix();
+    }
     if (focusTarget) {
       // 聚焦：偏心构图（noomo 编辑式排版）——lookAt 沿走廊方向偏移 0.9，
       // 画作让位到画面一侧，另一侧留白给 DOM 展签（左墙画→画偏右/展签在左，右墙反之）。

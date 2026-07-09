@@ -434,6 +434,8 @@ function MirrorAndCamera({
   nebula,
   act,
   cameraEnabled = true,
+  originZ = 0,
+  onShatter,
 }: {
   triggering: boolean;
   onComplete: () => void;
@@ -441,19 +443,19 @@ function MirrorAndCamera({
   act: 0 | 1;
   /** 单世界模式下走廊接管相机后置 false（idle 漂移与触发推进都停用） */
   cameraEnabled?: boolean;
+  /** 门的世界 z 原点（单世界把门立在走廊门槛前 originZ=GATE_ORIGIN_Z；场景组已整体平移，此处补相机数值） */
+  originZ?: number;
+  /** 碎裂瞬间回调（白闪峰值附近）——单世界借此切走廊可见/雾/隐镜湖环境 */
+  onShatter?: () => void;
 }) {
   const mirrorRef = useRef<THREE.Mesh>(null);
-  const portalRef = useRef<THREE.Mesh>(null);
   const groupRef = useRef<THREE.Group>(null);
   const lookYRef = useRef(0);
   const { camera } = useThree();
-  // 画界的拱形几何体：画界在框前方（吞没时要盖框），矩形会在拱肩处穿帮，
-  // 故与拱窗同形外扩；UV 已重映射，贴图构图与矩形版一致
-  const archGeom = useMemo(() => makeArchPortalGeometry(), []);
-  // 镜面同理：框贴图拱肩外是键控透明区，矩形镜面的上角会从拱肩后穿出——
-  // 镜面也用拱形（pad 更大，整圈塞进框带之下；框带世界宽 ~0.33）
+  // 镜面拱形几何体：框贴图拱肩外是键控透明区，矩形镜面的上角会从拱肩后穿出——
+  // 镜面用拱形（pad 大，整圈塞进框带之下；框带世界宽 ~0.33）
   const mirrorGeom = useMemo(() => makeArchPortalGeometry(0.14), []);
-  // 镜面用独立克隆贴图：呼吸动画改 offset/repeat，不能影响画界与碎片共享的原图
+  // 镜面用独立克隆贴图：呼吸动画改 offset/repeat，不能影响碎片共享的原图
   const mirrorMap = useMemo(() => {
     const t = nebula.clone();
     t.needsUpdate = true;
@@ -461,7 +463,7 @@ function MirrorAndCamera({
   }, [nebula]);
 
   // 相机接力（单世界）：门重新接管相机时恢复 gate 视角参数；
-  // 并在非触发态复位镜面/画界（从走廊回退到门时，转场留下的隐藏镜面要复原）
+  // 并在非触发态复位镜面（从走廊回退到门时，转场留下的隐藏镜面要复原）
   useEffect(() => {
     if (!cameraEnabled) return;
     const cam = camera as THREE.PerspectiveCamera;
@@ -473,9 +475,6 @@ function MirrorAndCamera({
   useEffect(() => {
     if (triggering) return;
     if (mirrorRef.current) mirrorRef.current.visible = true;
-    if (portalRef.current) {
-      (portalRef.current.material as THREE.MeshBasicMaterial).opacity = 0;
-    }
   }, [triggering]);
 
   // idle 阶段：视差全部交给相机环绕漂移；镜面不再自转
@@ -502,7 +501,7 @@ function MirrorAndCamera({
         }
       }
       // 幕1 拉远一点 + 视线下移：镜面在画面里上移收小，底部文案区不再压住镜面
-      const baseZ = act === 0 ? 9.6 : 5.7;
+      const baseZ = originZ + (act === 0 ? 9.6 : 5.7);
       const ax = act === 0 ? 0.8 : 0.42;
       const ay = act === 0 ? 0.32 : 0.18;
       const lookY = act === 0 ? 0 : -0.5;
@@ -522,37 +521,33 @@ function MirrorAndCamera({
         Math.cos(t * 0.09) * ay + py * 0.18,
         0.03,
       );
-      camera.lookAt(0, lookYRef.current, 0);
+      camera.lookAt(0, lookYRef.current, originZ);
     }
   });
 
   useEffect(() => {
     if (!triggering || !cameraEnabled) return;
     const tl = gsap.timeline();
-    // 严格顺序三拍（拍与拍零重叠——重叠正是「上一个动画没播完
-    // 下一个已开始」的粗糙感来源）：
-    //   第1拍 0~0.95s    碎裂完整谢幕：镜面缩没、碎片飞散并全部淡尽、白闪结束
-    //   第2拍 0.95~2.25s 显影+推进：画界在框中浮现（尺寸不动），相机加速推向
-    //                    画面直至穿过门框、画面吞满视野——是「我走进画里」，
-    //                    不是「画扑向我」（用户定稿 07-08：镜头推向画面）
-    //   第3拍 2.25~2.6s  静止帧：满屏画面完全静止，路由切换的冻结藏在这里
+    // 真连续穿门（单世界）——两拍：
+    //   第1拍 0~0.95s   碎裂谢幕：镜面瞬隐、碎片飞散淡尽；白闪峰值处 onShatter
+    //                   （外层借此把门内换成真走廊：走廊显形、雾切走廊值、镜湖环境隐去）
+    //   第2拍 0.95~2.25s 推进穿门：相机加速推过门洞（终点=走廊相机起点 originZ-0.5），
+    //                   门内已是真实走廊——不再有画界贴图、不再有静帧遮罩，
+    //                   「穿过门就走进了美术馆」
+    //   2.3s onComplete：相机已立在走廊入口，交给 CameraRig 接管（intro 自适应零跳变）
     if (mirrorRef.current) {
       // 瞬时隐去：碎片与镜面同位同图，接管是无缝的——
       // 「镜面缩小消失」动画本身就是"上一个画面没结束"的观感来源
       tl.set(mirrorRef.current, { visible: false }, 0.06);
     }
-    if (portalRef.current) {
-      const pm = portalRef.current.material as THREE.MeshBasicMaterial;
-      pm.opacity = 0;
-      tl.to(pm, { opacity: 1, duration: 0.45, ease: "power2.out" }, 0.95);
-    }
-    // 相机推进：归正 x/y 对准门心，z 一路推到画面跟前（z=1.1，距画界 ~0.98，
-    // 21:9 超宽屏也能满幅）。power2.in 先缓后急 = 坠入画中的加速度感。
-    // 推进全程 lookAt 跟随归正（视线从幕1的下俯回到画心），随位移逐帧应用。
+    if (onShatter) tl.call(onShatter, [], 0.1);
+    // 相机推进：归正 x/y 对准门心，z 一路推过门洞。power2.in 先缓后急 =
+    // 迈进门槛的加速度感。lookAt 全程看向「前方 6 单位」——推进中自然从
+    // 门心滑向走廊深处，与走廊 CameraRig 的注视语义(z-8)平滑衔接。
     const look = { y: lookYRef.current };
     tl.to(
       camera.position,
-      { x: 0, y: 0, z: 1.1, duration: 1.3, ease: "power2.in" },
+      { x: 0, y: 0, z: originZ - 0.5, duration: 1.3, ease: "power2.in" },
       0.95,
     );
     tl.to(
@@ -561,30 +556,22 @@ function MirrorAndCamera({
         y: 0,
         duration: 1.3,
         ease: "power2.out",
-        onUpdate: () => camera.lookAt(0, look.y, 0.12),
+        onUpdate: () => camera.lookAt(0, look.y, camera.position.z - 6),
       },
       0.95,
     );
-    tl.call(onComplete, [], 2.6);
+    tl.call(onComplete, [], 2.3);
     return () => {
       tl.kill();
     };
-  }, [triggering, camera, onComplete, cameraEnabled]);
+  }, [triggering, camera, onComplete, cameraEnabled, originZ, onShatter]);
 
   return (
     <group ref={groupRef}>
       {/* 镜面 = 望进梦境的星云传送门（黑镜的黑色四边形随视差歪斜会显得别扭）；
-          拱形几何体，上角不再从拱肩后穿出 */}
+          拱形几何体，上角不再从拱肩后穿出。碎裂后门内露出的是真实走廊（单世界）。 */}
       <mesh ref={mirrorRef} position={[0, 0, 0]} geometry={mirrorGeom}>
         <meshBasicMaterial map={mirrorMap} />
-      </mesh>
-      {/* 「画界」：碎镜后在拱窗原位显影的梦境图（拱形几何体，与拱窗同形），
-          相机随后加速推进穿框——画界在框前方（z=0.12），推进末段吞满视野。
-          fog=false 保画面鲜活。
-          注意：不用 visible=false 隐藏——opacity=0 保持渲染管线常驻，
-          纹理/着色器在挂载时就上传编译好；否则触发瞬间首次上传 GPU 必掉帧 */}
-      <mesh ref={portalRef} position={[0, 0, 0.12]} geometry={archGeom}>
-        <meshBasicMaterial map={nebula} transparent opacity={0} fog={false} depthWrite={false} />
       </mesh>
     </group>
   );
@@ -605,6 +592,9 @@ export function GateScene({
   standalone = true,
   cameraEnabled = true,
   visible = true,
+  originZ = 0,
+  hideEnvirons = false,
+  onShatter,
 }: MirrorGateProps) {
   const glow = useMemo(makeGlowTexture, []);
   const nebula = useMemo(makeNebulaTexture, []);
@@ -635,11 +625,14 @@ export function GateScene({
         </>
       )}
       {/* 场景本体：单世界模式下经 visible 整组显隐（隐藏时灯光/物体均不参与渲染，
-          但纹理/着色器常驻 GPU——切换零上传成本，这正是融合的意义） */}
-      <group visible={visible}>
+          但纹理/着色器常驻 GPU——切换零上传成本，这正是融合的意义）。
+          position.z=originZ：单世界把整座镜湖舞台平移到走廊门槛前。 */}
+      <group visible={visible} position={[0, 0, originZ]}>
       {/* 光源：环境光 + 半球光 + 顶光（紫白）+ 侧光（青绿）+ 辅光（紫罗兰） */}
       <ambientLight intensity={0.5} />
       <hemisphereLight color={ACCENT} groundColor={FOG_COLOR} intensity={0.38} />
+      {/* —— 镜湖环境（穿门瞬间整组隐去，藏进白闪；门框/碎片/粒子保留）—— */}
+      <group visible={!hideEnvirons}>
       {/* 天幕：无限影棚渐变背景（fog=false 保渐变纯净，否则远距被雾灰化） */}
       <mesh position={[0, 2, -17]}>
         <planeGeometry args={[64, 32]} />
@@ -653,11 +646,6 @@ export function GateScene({
         color={ACCENT_3}
         opacity={0.11}
       />
-      <pointLight position={[3, 4, 5]} intensity={1.2} color={ACCENT} distance={20} />
-      <pointLight position={[-4, -2, 3]} intensity={0.7} color={ACCENT_2} distance={15} />
-      <pointLight position={[0, 0, 3]} intensity={0.62} color={ACCENT_3} distance={11} />
-      {/* 注：不用 drei Environment（运行时联网拉 HDR，违背本地优先且可能卡首屏）；
-          镜框反射内容由场景光源承担 */}
       {/* 镜面背后的环境光晕：增加纵深与通透（大范围、低强度，从镜缘溢出） */}
       <GlowPlane
         texture={glow}
@@ -711,6 +699,12 @@ export function GateScene({
           depthWrite={false}
         />
       </mesh>
+      </group>
+      <pointLight position={[3, 4, 5]} intensity={1.2} color={ACCENT} distance={20} />
+      <pointLight position={[-4, -2, 3]} intensity={0.7} color={ACCENT_2} distance={15} />
+      <pointLight position={[0, 0, 3]} intensity={0.62} color={ACCENT_3} distance={11} />
+      {/* 注：不用 drei Environment（运行时联网拉 HDR，违背本地优先且可能卡首屏）；
+          镜框反射内容由场景光源承担 */}
       {mirrorFrameTex ? (
         <group position={[0, 0, -0.06]}>
           {/* 大理石拱门框：拱窗=2×3 对齐镜心（y 按实测窗心补偿）；
@@ -728,9 +722,9 @@ export function GateScene({
       ) : (
         <MirrorFrame glow={glow} />
       )}
-      {/* 定稿A：两侧云堤（加色混合黑底消隐；fog=false 保云的银边） */}
+      {/* 定稿A：两侧云堤（加色混合黑底消隐；fog=false 保云的银边）——属镜湖环境 */}
       {cloudTex && (
-        <>
+        <group visible={!hideEnvirons}>
           <mesh position={[-8.2, -1.0, -8]} rotation={[0, 0.55, 0]} scale={[15, 10, 1]}>
             <planeGeometry args={[1, 1]} />
             <meshBasicMaterial map={cloudTex} transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} fog={false} />
@@ -739,7 +733,7 @@ export function GateScene({
             <planeGeometry args={[1, 1]} />
             <meshBasicMaterial map={cloudTex} transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} fog={false} />
           </mesh>
-        </>
+        </group>
       )}
 
       <MirrorAndCamera
@@ -748,6 +742,8 @@ export function GateScene({
         nebula={mirrorTex}
         act={act}
         cameraEnabled={cameraEnabled}
+        originZ={originZ}
+        onShatter={onShatter}
       />
       <Shards triggered={triggering} nebula={mirrorTex} />
       <DreamParticles texture={glow} />
@@ -797,4 +793,10 @@ export interface MirrorGateProps {
   cameraEnabled?: boolean;
   /** 场景整组可见性（单世界 corridor 阶段隐藏门场景） */
   visible?: boolean;
+  /** 门的世界 z 原点：单世界把门立在走廊门槛前（场景组整体平移 + 相机数值偏移） */
+  originZ?: number;
+  /** 隐去镜湖环境（天幕/湖面/云堤/光池）——穿门瞬间起门内是真走廊，环境藏进白闪 */
+  hideEnvirons?: boolean;
+  /** 碎裂瞬间回调（白闪峰值附近），单世界切走廊显形/雾/环境 */
+  onShatter?: () => void;
 }

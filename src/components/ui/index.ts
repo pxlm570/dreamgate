@@ -10,4 +10,4 @@ export type { MagneticButtonProps } from "./MagneticButton";
 export { CustomCursor } from "./CustomCursor";
 export { SmoothScroll } from "./SmoothScroll";
 export { GlobalNav } from "./GlobalNav";
-export { EntranceVeil, MatchCutReveal } from "./EntranceVeil";
+export { EntranceVeil } from "./EntranceVeil";
