@@ -36,6 +36,8 @@ import { useSeedBootstrap, useStopNavigation } from "@/components/Gallery/hooks"
 import type { Dream } from "@/lib/types";
 
 const STORAGE_KEY = "dg-gallery-mode";
+/** 本会话已进入过画廊的标记——重挂(切到 /record、/dream/:id 再回 /gallery)时据此跳过揭幕 */
+const GALLERY_ENTERED_KEY = "dg-gallery-entered";
 /** 门的世界 z 原点：门立在走廊门槛前，推进终点(originZ-0.5)≈走廊相机起点(z=4)，接力零跳变 */
 const GATE_ORIGIN_Z = 4.5;
 
@@ -132,6 +134,16 @@ export default function WorldPage() {
   // 穿门中间态：碎裂白闪瞬间置 true——走廊显形、雾/后处理切走廊值、镜湖环境隐去。
   // 真连续的关键：从这一刻起门内就是真实走廊，相机推进穿门，无任何遮罩。
   const [crossing, setCrossing] = useState(false);
+  // 本会话是否已进入过画廊——重挂时据此跳过揭幕。
+  // 首次穿门进画廊本就不播揭幕(crossing=true 零遮罩真连续);首次深链 /gallery 仍播揭幕盖 3D 初始化。
+  const [galleryEntered, setGalleryEntered] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return sessionStorage.getItem(GALLERY_ENTERED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
 
   useSeedBootstrap();
 
@@ -146,6 +158,21 @@ export default function WorldPage() {
       setAct(0);
       setCrossing(false);
     }
+  }, [stage]);
+
+  // 进入走廊后标记「本会话已进入画廊」——重挂(去 /record 回 /gallery)时据此跳过揭幕。
+  // 延迟 1.6s(> 揭幕 1.4s)写,避免截断首次深链揭幕;卸载清定时器。
+  useEffect(() => {
+    if (stage !== "corridor") return;
+    const t = window.setTimeout(() => {
+      try {
+        sessionStorage.setItem(GALLERY_ENTERED_KEY, "1");
+      } catch {
+        /* ignore */
+      }
+      setGalleryEntered(true);
+    }, 1600);
+    return () => window.clearTimeout(t);
   }, [stage]);
 
   // —— 门的分幕推进 ——
@@ -396,9 +423,8 @@ export default function WorldPage() {
       )}
       {stage === "corridor" && loaded && dreams.length > 0 && galleryMode === "3d" && (
         <>
-          {/* 入场揭幕：穿门而来（crossing）零遮罩——相机本来就已走进走廊，真连续；
-              直接深链才盖深色幕布 */}
-          {!crossing && <EntranceVeil />}
+          {/* 入场揭幕：直接深链才盖深色幕布；穿门(crossing)零遮罩；本会话已进入过画廊也不再盖 */}
+          {!crossing && !galleryEntered && <EntranceVeil />}
           {galleryHeader}
           {a11yList}
           {!withShaderFog && (

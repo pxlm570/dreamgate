@@ -47,7 +47,7 @@ export function ExportButton({
       disabled={!canExport}
     >
       <Download size={14} />
-      {label}
+      <span className="hidden sm:inline">{label}</span>
     </Button>
   );
 }

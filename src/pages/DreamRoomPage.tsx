@@ -115,7 +115,7 @@ export default function DreamRoomPage() {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, delay: 0.4, ease: "easeOut" }}
-        className="fixed inset-x-0 top-0 z-30 flex items-center justify-between px-4 py-3.5 sm:px-6"
+        className="fixed inset-x-0 top-0 z-30 flex items-center justify-between px-3 py-2.5 sm:px-6 sm:py-3.5"
       >
         <Link to="/gallery">
           <Button variant="ghost" size="sm" className="border border-white/10 bg-black/30 backdrop-blur-md">
