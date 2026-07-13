@@ -78,17 +78,23 @@ function WorldAtmosphere({
   );
 }
 
-/** 后处理——两场景参数不同，按 stage 切换（重建藏在静止帧后） */
+/**
+ * 后处理——参数按 stage 派生，EffectComposer 实例不重建（避免 framebuffer
+ * 重新分配导致的穿门瞬间掉帧）。红线遵守：参数值与原两分支完全一致，仅合并为
+ * 单一组件避免 stage 切换时卸载/挂载重建。
+ */
 function WorldEffects({ stage }: { stage: Stage }) {
-  return stage === "gate" ? (
+  const isCorridor = stage === "corridor";
+  return (
     <EffectComposer>
-      <Bloom intensity={0.95} luminanceThreshold={0.22} luminanceSmoothing={0.5} mipmapBlur radius={0.72} />
-      <Vignette eskil={false} offset={0.12} darkness={0.7} />
-    </EffectComposer>
-  ) : (
-    <EffectComposer>
-      <Bloom intensity={0.85} luminanceThreshold={0.28} luminanceSmoothing={0.5} mipmapBlur radius={0.65} />
-      <Vignette eskil={false} offset={0.16} darkness={0.62} />
+      <Bloom
+        intensity={isCorridor ? 0.85 : 0.95}
+        luminanceThreshold={isCorridor ? 0.28 : 0.22}
+        luminanceSmoothing={0.5}
+        mipmapBlur
+        radius={isCorridor ? 0.65 : 0.72}
+      />
+      <Vignette eskil={false} offset={isCorridor ? 0.16 : 0.12} darkness={isCorridor ? 0.62 : 0.7} />
     </EffectComposer>
   );
 }
@@ -436,12 +442,33 @@ export default function WorldPage() {
           {!withShaderFog && (
             <Fog className="pointer-events-none fixed inset-0 z-[1]" intensity={0.5} color={accentColor} />
           )}
-          {!diving && (
+          {/* 走廊中段：逐画前行提示（走到尽头时隐藏，让位给记录引导区） */}
+          {!diving && stop < recentCount && (
             <div className="pointer-events-none fixed inset-x-0 bottom-6 z-20 flex justify-center">
               <Caption as="div" className="animate-pulse-glow rounded-full border border-white/10 bg-dreamgate-elevated/40 px-4 py-1.5 text-[11px] uppercase tracking-widest backdrop-blur-md">
                 滚动 · 逐画前行{stop > 0 ? ` · ${Math.min(stop + 1, recentCount)} / ${recentCount}` : ""} · 点击画作或简介 · 入画
               </Caption>
             </div>
+          )}
+          {/* 走廊尽头「仍未发现的梦境」引导：3D 模式走到末档时的视觉突出记录入口 */}
+          {!diving && stop >= recentCount && recentCount > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, ease: "easeOut" }}
+              className="pointer-events-auto fixed inset-x-0 bottom-10 z-20 mx-auto flex max-w-md flex-col items-center gap-3 rounded-[1.5rem] border border-dreamgate-ethereal/20 bg-dreamgate-elevated/30 px-6 py-7 text-center backdrop-blur-md sm:bottom-16"
+            >
+              <Display className="text-xl sm:text-2xl">仍未发现的梦境</Display>
+              <Caption as="p" className="text-xs sm:text-sm">
+                走廊的下一扇门，等你写下新的梦境来点亮
+              </Caption>
+              <Link to="/record" className="mt-1">
+                <Button variant="primary" size="md" className="min-w-[180px]">
+                  <Plus size={16} />
+                  记录新的梦境
+                </Button>
+              </Link>
+            </motion.div>
           )}
           {/* 画作信息由墙上的美术馆式简介牌承载（DreamDoor 内 3D 展牌），
               点画作或简介即直接入画——旧的两步聚焦展签已退役（用户定稿 07-09） */}

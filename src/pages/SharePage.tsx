@@ -56,9 +56,11 @@ export default function SharePage() {
     [search],
   );
 
-  // 优先用 store 中的真实梦境；否则降级用 URL 摘要
-  const dream: Dream | null =
-    storeDream ?? (shared ? summaryToDream(shared.summary, id ?? "shared") : null);
+  // 优先用 URL ?d= 摘要（只读分享模式）；无 ?d= 时才用本地 store 中的真实梦境（编辑模式）
+  // 修复：之前 storeDream 优先导致 /share/seed-1?d=xxx 时忽略 ?d= 直接渲染本地编辑器
+  const dream: Dream | null = shared
+    ? summaryToDream(shared.summary, id ?? "shared")
+    : storeDream ?? null;
 
   // 只读模式：URL 里有 ?d= → 用链接里的 config
   const readOnly = !!shared;

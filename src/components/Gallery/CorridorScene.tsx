@@ -459,9 +459,11 @@ function CameraRig({
  * 参数必须保守（用户反馈「经常自动跳 2.5D」的根因就是旧参数太激进）：
  * - 预热 4s：穿门抵达后的纹理解码/入场推镜/字体绘制全是掉帧高峰，采样必须避开
  * - 采样 3s + 阈值 22fps：只对「持续真卡」降级，瞬时抖动不触发（降级不可逆，宁纵勿枉）
+ * - 连续 2 个低帧窗口才触发（任务4 修复）：单次滑动运镜导致的瞬时掉帧不触发降级，
+ *   需要持续 ~6s+ 真实低帧率才会降级——滑动操作再也不会误切 2.5D
  */
 function FpsSampler({ onLow }: { onLow?: () => void }) {
-  const ref = useRef({ warmUntil: 0, sampleStart: 0, frames: 0, fired: false });
+  const ref = useRef({ warmUntil: 0, sampleStart: 0, frames: 0, fired: false, lowStreak: 0 });
   useFrame(() => {
     const s = ref.current;
     if (s.fired || !onLow) return;
@@ -479,9 +481,22 @@ function FpsSampler({ onLow }: { onLow?: () => void }) {
     s.frames += 1;
     const elapsed = now - s.sampleStart;
     if (elapsed >= 3000) {
-      s.fired = true;
       const fps = (s.frames / elapsed) * 1000;
-      if (fps < 22) onLow();
+      if (fps < 22) {
+        // 低帧窗口：累加连续计数；连续 2 次才触发降级
+        s.lowStreak += 1;
+        if (s.lowStreak >= 2) {
+          s.fired = true;
+          onLow();
+          return;
+        }
+      } else {
+        // 正常帧窗口：重置连续计数——瞬时掉帧不累积
+        s.lowStreak = 0;
+      }
+      // 开启下一个采样窗口
+      s.sampleStart = now;
+      s.frames = 0;
     }
   });
   return null;

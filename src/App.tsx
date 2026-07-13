@@ -1,20 +1,47 @@
-import { Suspense, lazy, useEffect } from 'react';
+import { Suspense, lazy, useEffect, type ComponentType } from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { DisclaimerFooter } from '@/components/Privacy';
 import { CustomCursor, GlobalNav, ErrorBoundary } from '@/components/ui';
 import { useDreamStore } from '@/store/useDreamStore';
 
 /**
+ * 可重试的懒加载：Vite dev server 重启/HMR 断连后旧 chunk URL 失效，
+ * 浏览器仍缓存旧 import map → "Failed to fetch dynamically imported module"。
+ * 失败时整页刷新一次（sessionStorage 计数防无限刷新），让浏览器拿到新的 chunk 映射。
+ */
+function lazyRetry<T extends { default: ComponentType<unknown> }>(
+  importer: () => Promise<T>,
+  name: string,
+) {
+  return lazy(async () => {
+    const KEY = `dg-lazy-retry-${name}`;
+    try {
+      const mod = await importer();
+      sessionStorage.removeItem(KEY);
+      return mod;
+    } catch (error) {
+      const count = Number(sessionStorage.getItem(KEY) ?? '0');
+      if (count < 1) {
+        sessionStorage.setItem(KEY, '1');
+        console.error(`[DreamGate] ${name} 加载失败，正在刷新页面…`, error);
+        window.location.reload();
+      }
+      throw error;
+    }
+  });
+}
+
+/**
  * 路由级懒加载：three.js / @react-three / postprocessing 等重依赖只在用到它们的
  * 页面（镜门 / 画廊 / 分享）按需加载，缩小首屏 bundle。
  * HashRouter 不影响代码分割（其仅关乎 SPA fallback，与按需 import 无关）。
  */
-const WorldPage = lazy(() => import('@/pages/WorldPage'));
-const RecordPage = lazy(() => import('@/pages/RecordPage'));
-const DreamRoomPage = lazy(() => import('@/pages/DreamRoomPage'));
-const SharePage = lazy(() => import('@/pages/SharePage'));
-const ReportPage = lazy(() => import('@/pages/ReportPage'));
-const DreamPoolPage = lazy(() => import('@/pages/DreamPoolPage'));
+const WorldPage = lazyRetry(() => import('@/pages/WorldPage'), 'WorldPage');
+const RecordPage = lazyRetry(() => import('@/pages/RecordPage'), 'RecordPage');
+const DreamRoomPage = lazyRetry(() => import('@/pages/DreamRoomPage'), 'DreamRoomPage');
+const SharePage = lazyRetry(() => import('@/pages/SharePage'), 'SharePage');
+const ReportPage = lazyRetry(() => import('@/pages/ReportPage'), 'ReportPage');
+const DreamPoolPage = lazyRetry(() => import('@/pages/DreamPoolPage'), 'DreamPoolPage');
 
 /** 路由切换时的轻量占位（保持深色背景，避免白闪） */
 function RouteFallback() {

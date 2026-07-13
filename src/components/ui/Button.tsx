@@ -23,9 +23,10 @@ const variantClasses: Record<Variant, string> = {
 };
 
 const sizeClasses: Record<Size, string> = {
-  sm: "px-4 py-1.5 text-sm tracking-wide rounded-full",
-  md: "px-6 py-2.5 text-base tracking-wide rounded-full",
-  lg: "px-8 py-3.5 text-lg tracking-wider rounded-full",
+  // min-h 确保移动端触摸目标 ≥44px（WCAG 2.5.5），桌面端视觉比例不受影响
+  sm: "px-4 py-1.5 text-sm tracking-wide rounded-full min-h-[44px]",
+  md: "px-6 py-2.5 text-base tracking-wide rounded-full min-h-[44px]",
+  lg: "px-8 py-3.5 text-lg tracking-wider rounded-full min-h-[48px]",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
