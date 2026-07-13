@@ -44,6 +44,7 @@ export default function ReportPage() {
   const setView = useDreamStore((s) => s.setView);
   const dreams = useDreamStore((s) => s.dreams);
   const meta = useDreamStore((s) => s.meta);
+  const loaded = useDreamStore((s) => s.loaded);
 
   useEffect(() => {
     setView("report");
@@ -82,7 +83,19 @@ export default function ReportPage() {
           </MagneticButton>
         </motion.header>
 
-        {!hasDreams ? (
+        {!loaded ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-1 flex-col items-center justify-center gap-4 text-center"
+          >
+            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-dreamgate-ethereal shadow-[0_0_12px_rgba(201,184,232,0.6)]" />
+            <Caption as="p" className="text-sm text-dreamgate-text-muted">
+              正在浮现图谱…
+            </Caption>
+          </motion.div>
+        ) : !hasDreams ? (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}

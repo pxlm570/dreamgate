@@ -140,11 +140,19 @@ function CorridorWalls({ length, accentColor, glowTex, endMist, wallPanel, floor
   // （之前 +16 会在尽头露出背景色的方形截面——「字的背景像塑料板」的元凶）
   const wallLen = length + 90;
   const centerZ = -length / 2 - 25;
-  const endText = useMemo(makeEndTextTexture, []);
+  // 收集本组件 useMemo 创建/克隆的纹理，卸载时统一 dispose 释放 GPU 内存
+  // （R3F 不自动 dispose 传给 material 的纹理；glowTex/endMist 由父组件拥有，不在此收集）
+  const texturesRef = useRef<THREE.Texture[]>([]);
+  const endText = useMemo(() => {
+    const r = makeEndTextTexture();
+    texturesRef.current.push(r.tex);
+    return r;
+  }, []);
   // 墙面光衰减贴图：沿墙长镜像平铺（避免噪点被拉成横向条纹）
   const wallGrad = useMemo(() => {
     const t = makeWallGradTexture();
     t.repeat.set(Math.max(wallLen / 8, 1), 1);
+    texturesRef.current.push(t);
     return t;
   }, [wallLen]);
   // 护墙板逐墙对齐：瓦片=8 个世界单位（同侧门间距），把门位对到瓦片中心
@@ -165,7 +173,11 @@ function CorridorWalls({ length, accentColor, glowTex, endMist, wallPanel, floor
     // 门要挂在嵌板中央（美术馆挂画逻辑），不能横跨两块板：
     // 瓦片内两块嵌板中心在相位 0.25 / 0.75——把门位相位对到 0.25
     const rightPhase = ((((length + 66) / 8) % 1) + 1) % 1;
-    return { left: mk(-0.25), right: mk(0.25 - rightPhase) };
+    const left = mk(-0.25);
+    const right = mk(0.25 - rightPhase);
+    if (left) texturesRef.current.push(left);
+    if (right) texturesRef.current.push(right);
+    return { left, right };
   }, [wallPanel, wallLen, length]);
   // 地板拼花：4×4 世界单位一瓦（纹样放大到肉眼可读）
   const floorTex = useMemo(() => {
@@ -175,6 +187,7 @@ function CorridorWalls({ length, accentColor, glowTex, endMist, wallPanel, floor
     t.wrapT = THREE.RepeatWrapping;
     t.repeat.set(1.5, wallLen / 4);
     t.needsUpdate = true;
+    texturesRef.current.push(t);
     return t;
   }, [floorBase, wallLen]);
   // 藻井天花：6×6 世界单位一瓦
@@ -185,8 +198,17 @@ function CorridorWalls({ length, accentColor, glowTex, endMist, wallPanel, floor
     t.wrapT = THREE.RepeatWrapping;
     t.repeat.set(1, wallLen / 6);
     t.needsUpdate = true;
+    texturesRef.current.push(t);
     return t;
   }, [ceilBase, wallLen]);
+  // 卸载时释放本组件创建/克隆的纹理 GPU 内存（StrictMode 双调用下 push 重复引用，
+  // dispose 幂等安全）
+  useEffect(() => {
+    return () => {
+      for (const t of texturesRef.current) t.dispose();
+      texturesRef.current = [];
+    };
+  }, []);
   return (
     <group>
       {/* 地板：拼花木地板（gpt-image）+ 克制的反射——

@@ -25,6 +25,7 @@ export default function DreamRoomPage() {
   const setView = useDreamStore((s) => s.setView);
   const setSelectedDream = useDreamStore((s) => s.setSelectedDream);
   const dream = useDreamStore((s) => s.dreams.find((d) => d.id === id));
+  const loaded = useDreamStore((s) => s.loaded);
   const updateDream = useDreamStore((s) => s.updateDream);
 
   const [regenKey, setRegenKey] = useState(0);
@@ -45,6 +46,18 @@ export default function DreamRoomPage() {
     setRegenKey((k) => k + 1);
   };
 
+  if (!loaded) {
+    // 加载中：不误判「不存在」——直接访问 /dream/:id（分享链接 / 刷新）时，
+    // IndexedDB 尚未加载完成，dream 暂时为 undefined，应显示加载态而非错误态。
+    return (
+      <Backdrop preset="default" intensity={0.4}>
+        <div className="mx-auto flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-dreamgate-ethereal shadow-[0_0_12px_rgba(201,184,232,0.6)]" />
+          <Caption as="p" className="text-sm text-dreamgate-text-muted">正在拾取梦境…</Caption>
+        </div>
+      </Backdrop>
+    );
+  }
   if (!dream) {
     return (
       <Backdrop preset="default" intensity={0.4}>

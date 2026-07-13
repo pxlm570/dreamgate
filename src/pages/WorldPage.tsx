@@ -22,7 +22,7 @@ import { useDegradation, triggerDegradation } from "@/lib/degradation";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { getEmotionByWord } from "@/lib/emotions";
 import { Fog } from "@/components/Atmosphere";
-import { Button, Display, Caption, EntranceVeil } from "@/components/ui";
+import { Button, Display, Caption, EntranceVeil, ErrorBoundary } from "@/components/ui";
 import { GateScene, GateOverlay, CssMirrorFallback, GATE_ATMOSPHERE } from "@/components/Gate";
 import {
   CorridorWorld,
@@ -356,51 +356,57 @@ export default function WorldPage() {
         else advance(1);
       }}
     >
-      {/* —— 单一持久 Canvas：两场景组同时挂载，visible/cameraEnabled 按 stage 翻转 —— */}
+      {/* —— 单一持久 Canvas：两场景组同时挂载，visible/cameraEnabled 按 stage 翻转 ——
+          局部 ErrorBoundary：3D 崩溃（WebGL context lost / shader / 纹理）时降级到静态 UI，
+          保留上层 header/nav 不白屏。红线：Canvas props 与状态机不变，仅外层包裹。 */}
       {canvasOn && (
         <div className="fixed inset-0 z-0">
-          <Canvas
-            camera={{ position: [0, 0, 6], fov: 50 }}
-            dpr={typeof window !== "undefined" && window.innerWidth < 768 ? [1, 1.2] : [1, 1.5]}
-            gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
-            style={{ position: "absolute", inset: 0 }}
+          <ErrorBoundary
+            fallback={(_err, reset) => <CanvasCrashFallback stage={stage} onReset={reset} />}
           >
-            {/* 氛围/后处理按「视觉阶段」切换：碎裂白闪起（crossing）即用走廊值 */}
-            <WorldAtmosphere
-              stage={crossing || stage === "corridor" ? "corridor" : "gate"}
-              dreams={dreams}
-              withShaderFog={withShaderFog}
-            />
-            {/* 门体常驻可见：走廊阶段回头能看到来路的拱门（门内星云仍在）——
-                空间连续感；镜湖环境（天幕/湖面/云堤）自 crossing 起隐去 */}
-            <GateScene
-              standalone={false}
-              visible
-              cameraEnabled={stage === "gate"}
-              triggering={stage === "gate" && phase === "triggered"}
-              onComplete={handleComplete}
-              act={act}
-              originZ={GATE_ORIGIN_Z}
-              hideEnvirons={crossing || stage === "corridor"}
-              onShatter={handleShatter}
-            />
-            {corridorMounted && (
-              <CorridorWorld
-                standalone={false}
-                visible={crossing || stage === "corridor"}
-                cameraEnabled={stage === "corridor"}
+            <Canvas
+              camera={{ position: [0, 0, 6], fov: 50 }}
+              dpr={typeof window !== "undefined" && window.innerWidth < 768 ? [1, 1.2] : [1, 1.5]}
+              gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
+              style={{ position: "absolute", inset: 0 }}
+            >
+              {/* 氛围/后处理按「视觉阶段」切换：碎裂白闪起（crossing）即用走廊值 */}
+              <WorldAtmosphere
+                stage={crossing || stage === "corridor" ? "corridor" : "gate"}
                 dreams={dreams}
-                onDoorClick={handleSelect}
-                scrollRef={scrollRef}
                 withShaderFog={withShaderFog}
-                reduceMotion={reduceMotion}
-                onLowPerformance={() => triggerDegradation("desktop3D")}
-                focusedId={focused?.id ?? null}
-                diving={diving}
               />
-            )}
-            <WorldEffects stage={crossing || stage === "corridor" ? "corridor" : "gate"} />
-          </Canvas>
+              {/* 门体常驻可见：走廊阶段回头能看到来路的拱门（门内星云仍在）——
+                  空间连续感；镜湖环境（天幕/湖面/云堤）自 crossing 起隐去 */}
+              <GateScene
+                standalone={false}
+                visible
+                cameraEnabled={stage === "gate"}
+                triggering={stage === "gate" && phase === "triggered"}
+                onComplete={handleComplete}
+                act={act}
+                originZ={GATE_ORIGIN_Z}
+                hideEnvirons={crossing || stage === "corridor"}
+                onShatter={handleShatter}
+              />
+              {corridorMounted && (
+                <CorridorWorld
+                  standalone={false}
+                  visible={crossing || stage === "corridor"}
+                  cameraEnabled={stage === "corridor"}
+                  dreams={dreams}
+                  onDoorClick={handleSelect}
+                  scrollRef={scrollRef}
+                  withShaderFog={withShaderFog}
+                  reduceMotion={reduceMotion}
+                  onLowPerformance={() => triggerDegradation("desktop3D")}
+                  focusedId={focused?.id ?? null}
+                  diving={diving}
+                />
+              )}
+              <WorldEffects stage={crossing || stage === "corridor" ? "corridor" : "gate"} />
+            </Canvas>
+          </ErrorBoundary>
         </div>
       )}
 
@@ -463,6 +469,41 @@ export default function WorldPage() {
           </main>
         </>
       )}
+    </div>
+  );
+}
+
+/** Canvas 崩溃兜底：3D 渲染失败时显示静态 UI（保留上层 header/nav 不白屏） */
+function CanvasCrashFallback({ stage, onReset }: { stage: Stage; onReset: () => void }) {
+  const isCorridor = stage === "corridor";
+  return (
+    <div
+      role="alert"
+      className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-dreamgate-deep px-6 text-center"
+    >
+      <div className="flex flex-col items-center gap-2">
+        <p className="font-display text-2xl font-light tracking-[0.2em] text-dreamgate-text-primary">
+          {isCorridor ? "画廊暂时失焦" : "镜之门暂时失焦"}
+        </p>
+        <p className="max-w-sm text-sm text-dreamgate-text-muted">
+          3D 场景未能渲染。可重试，或前往记录新的梦境。
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <button
+          type="button"
+          onClick={onReset}
+          className="rounded-full border border-dreamgate-ethereal/40 bg-dreamgate-elevated/30 px-5 py-2 text-sm tracking-wide text-dreamgate-ethereal backdrop-blur-sm transition hover:bg-dreamgate-ethereal/10"
+        >
+          重试
+        </button>
+        <a
+          href="#/record"
+          className="rounded-full border border-white/15 bg-dreamgate-ethereal/90 px-5 py-2 text-sm font-semibold tracking-wide text-dreamgate-deep transition hover:brightness-110"
+        >
+          记录新梦
+        </a>
+      </div>
     </div>
   );
 }

@@ -4,10 +4,12 @@
 // 兜底（4.7）：图像 onError → seedLibrary；拒绝 AI → 全本地规则 + 种子图
 
 import { useEffect, useRef, useState } from "react";
+import { AlertTriangle } from "lucide-react";
 import { useDreamStore } from "@/store/useDreamStore";
 import { generateArtifact, generateDreamImage, preloadImage, type GeneratedArtifact } from "@/lib/ai";
 import { getSeedImage } from "@/lib/seedLibrary";
 import { parseEmotionByRules, parseSymbolsByRules, generateRuleAnalysis } from "@/lib/ruleParser";
+import { Button } from "@/components/ui";
 import type { AestheticPresetName, Dream } from "@/lib/types";
 import { AestheticOnboarding } from "./AestheticOnboarding";
 import { AiConsentDialog } from "./AiConsentDialog";
@@ -54,6 +56,11 @@ export function GenerationOrchestrator({ dream }: GenerationOrchestratorProps) {
   const erroredUrlsRef = useRef<Set<string>>(new Set());
   // 同一 dream 只发起一次生成，去重 StrictMode 双跑 / 重渲染导致的重复 AI 调用
   const inFlightRef = useRef<{ key: string; promise: Promise<GeneratedArtifact> } | null>(null);
+  // 致命错误：generateArtifact 内部已有图像/解析兜底，这里只覆盖 updateDream（IndexedDB 写入）
+  // 失败这一窄路径——用户卡在加载态无感知。fatalError 触发就地上卡片 + 重试。
+  const [fatalError, setFatalError] = useState(false);
+  // 重试令牌：递增压入 effect 依赖，触发 run() 重跑（重试时同步清 inFlightRef 避免 reuse rejected promise）
+  const [retryToken, setRetryToken] = useState(0);
 
   const showOnboarding = !meta.onboarded;
   const showConsent = meta.onboarded && !meta.aiConsent && !aiDeclined;
@@ -129,10 +136,13 @@ export function GenerationOrchestrator({ dream }: GenerationOrchestratorProps) {
       if (!cancelled) setPhase("done");
     }
 
-    run().catch((err) => console.error("[DreamGate] generateArtifact failed:", err));
+    run().catch((err) => {
+      console.error("[DreamGate] generateArtifact failed:", err);
+      setFatalError(true);
+    });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showOnboarding, showConsent, aiDeclined]);
+  }, [showOnboarding, showConsent, aiDeclined, retryToken]);
 
   const handleImageError = () => {
     // 记录当前正在展示、且加载失败的 URL
@@ -172,8 +182,15 @@ export function GenerationOrchestrator({ dream }: GenerationOrchestratorProps) {
     }
   };
 
-  const showProgress = !showOnboarding && !showConsent && (phase !== "done" || !artifact);
+  const showProgress = !showOnboarding && !showConsent && !fatalError && (phase !== "done" || !artifact);
   const showArtifactView = !showOnboarding && !showConsent && phase === "done" && !!artifact;
+  const showFatalError = !showOnboarding && !showConsent && fatalError && !showArtifactView;
+
+  const handleRetry = () => {
+    setFatalError(false);
+    inFlightRef.current = null; // 清掉可能 rejected 的 promise，让 effect 重建
+    setRetryToken((t) => t + 1);
+  };
 
   return (
     <>
@@ -209,6 +226,25 @@ export function GenerationOrchestrator({ dream }: GenerationOrchestratorProps) {
       )}
       {showArtifactView && artifact && (
         <ArtifactView dream={{ ...dream, artifact }} onImageError={handleImageError} />
+      )}
+      {showFatalError && (
+        <div
+          role="alert"
+          className="mx-auto flex max-w-md flex-col items-center gap-4 rounded-2xl border border-amber-400/20 bg-dreamgate-elevated/40 px-6 py-8 text-center backdrop-blur-md"
+        >
+          <AlertTriangle size={28} className="text-amber-300/80" />
+          <div className="flex flex-col gap-1.5">
+            <p className="font-display text-lg tracking-wide text-dreamgate-text-primary">
+              生成未能完成
+            </p>
+            <p className="text-sm text-dreamgate-text-muted">
+              可能是浏览器存储受限（隐身模式 / 配额已满），导致结果无法保存。可重试一次。
+            </p>
+          </div>
+          <Button variant="ethereal" size="sm" onClick={handleRetry}>
+            重试
+          </Button>
+        </div>
       )}
     </>
   );

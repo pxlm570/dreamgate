@@ -18,8 +18,28 @@
  * 前端 ai.ts 的 analyzeDream 会捕获错误并走 ruleParser 降级。
  */
 
-// EdgeOne 注入的全局 AI binding（不入 tsconfig include，不影响 npm run check/build）
-declare const AI: any;
+// EdgeOne 注入的全局 AI binding（不入 tsconfig include，不影响 npm run check/build）。
+// 最小类型声明：只覆盖 llm.ts 实际用到的 chatCompletions 方法签名。R9 风险缓解：
+// 防御性提取 content 兼容 string / choices / Response 三种形态（union 返回类型）。
+interface EdgeAIChatCompletionResponse {
+  choices?: { message?: { content?: string } }[];
+}
+interface EdgeAIBinding {
+  chatCompletions: (opts: {
+    model: string;
+    messages: { role: string; content: string }[];
+    stream?: boolean;
+    temperature?: number;
+    max_tokens?: number;
+  }) => Promise<EdgeAIChatCompletionResponse | string | Response>;
+}
+declare const AI: EdgeAIBinding | undefined;
+
+/** EdgeOne Pages 边缘函数 context（最小类型声明） */
+interface EdgeOneContext {
+  request: Request;
+  env?: Record<string, string>;
+}
 
 const SYSTEM_PROMPT = `你是一名梦境解析助手，专注于把用户的梦境文本解析为结构化的情绪与符号概率地图。请严格遵循以下规则：
 
@@ -120,7 +140,7 @@ function normalizeAnalysis(data: unknown): {
 }
 
 /** EdgeOne Pages 边缘函数约定：导出 onRequest(context)，从 context.request 取 Request */
-export async function onRequest(context: any): Promise<Response> {
+export async function onRequest(context: EdgeOneContext): Promise<Response> {
   // v3 关键修复：context.request 才是 Request（api/llm.ts:212 把 context 当 Request 用会运行时崩溃）
   const req = context.request;
 
@@ -175,7 +195,7 @@ export async function onRequest(context: any): Promise<Response> {
   ];
 
   // v3 #7：Edge AI 调用 + try/catch
-  let resp: any;
+  let resp: EdgeAIChatCompletionResponse | string | Response;
   try {
     resp = await AI.chatCompletions({
       model: '@tx/deepseek-ai/deepseek-v3-0324',
@@ -195,13 +215,15 @@ export async function onRequest(context: any): Promise<Response> {
   }
 
   // v3：防御性提取 content（兼容 string / choices / Response 三种形态，R9 风险缓解）
+  // 分支顺序：Response 检查置于 choices 之前，便于 TS 在 union 上 narrowing
+  // （Response 无 choices 字段；三者互斥，顺序调整不改运行时行为）。
   let content = '';
   if (typeof resp === 'string') {
     content = resp;
-  } else if (resp?.choices?.[0]?.message?.content) {
-    content = resp.choices[0].message.content;
   } else if (resp instanceof Response) {
     content = await resp.text();
+  } else if (resp?.choices?.[0]?.message?.content) {
+    content = resp.choices[0].message.content;
   } else {
     // 兜底：尝试 JSON.stringify 看形态
     return json(

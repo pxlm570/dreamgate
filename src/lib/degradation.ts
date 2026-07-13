@@ -48,12 +48,14 @@ function emitChange(): void {
   for (const l of listeners) l();
 }
 
-function subscribe(listener: () => void): () => void {
+/** 订阅降级状态变化（useSyncExternalStore 标准接口，导出供测试与自定义订阅） */
+export function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
 
-function getSnapshot(): DegradationState {
+/** 读取当前降级状态快照（useSyncExternalStore 标准接口，导出供测试与自定义订阅） */
+export function getSnapshot(): DegradationState {
   return runtimeState;
 }
 

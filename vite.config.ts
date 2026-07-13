@@ -59,6 +59,9 @@ export default defineConfig(({ mode }) => {
   return {
   build: {
     sourcemap: 'hidden',
+    // vendor-three ≈ 799kB(gzip 208kB) 是 three.js 固有体量，进一步拆分缓存收益边际
+    // （three / @react-three / postprocessing 同页加载）。提高告警阈值消除构建噪音。
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         // 按库拆分 vendor，便于浏览器跨部署独立缓存（three 体量大，单独成块）

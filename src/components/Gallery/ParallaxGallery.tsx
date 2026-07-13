@@ -1,7 +1,7 @@
 // ParallaxGallery — 移动端 / 降级 2.5D 视差画廊
 // CSS 3D perspective 容器 + 卡片纵向排列，每张卡 GSAP scrollTrigger scrub 驱动 translateZ/rotateX
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import type { Dream } from "@/lib/types";
@@ -19,8 +19,8 @@ export function ParallaxGallery({
   onCardClick,
 }: ParallaxGalleryProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  // 最近 20 条，最新在前
-  const recent = dreams.slice(-20).reverse();
+  // 最近 20 条，最新在前（按 dreams 引用缓存，避免每次渲染重算）
+  const recent = useMemo(() => dreams.slice(-20).reverse(), [dreams]);
 
   useEffect(() => {
     const container = containerRef.current;

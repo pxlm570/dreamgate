@@ -11,3 +11,5 @@ export { CustomCursor } from "./CustomCursor";
 export { SmoothScroll } from "./SmoothScroll";
 export { GlobalNav } from "./GlobalNav";
 export { EntranceVeil } from "./EntranceVeil";
+export { ErrorBoundary, DefaultFallback } from "./ErrorBoundary";
+export type { ErrorBoundaryProps } from "./ErrorBoundary";

@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { DisclaimerFooter } from '@/components/Privacy';
-import { CustomCursor, GlobalNav } from '@/components/ui';
+import { CustomCursor, GlobalNav, ErrorBoundary } from '@/components/ui';
 import { useDreamStore } from '@/store/useDreamStore';
 
 /**
@@ -49,33 +49,35 @@ export default function App() {
   }, [setOffline]);
 
   return (
-    <Router>
-      <Suspense fallback={<RouteFallback />}>
-        <Routes>
-          {/* 单世界 layout route：镜之门与 3D 走廊共享一个持久 Canvas，
+    <ErrorBoundary>
+      <Router>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            {/* 单世界 layout route：镜之门与 3D 走廊共享一个持久 Canvas，
               "/" ↔ "/gallery" 切换时 WorldPage 不重挂——转场只是场景组翻转+相机接力 */}
-          <Route element={<WorldPage />}>
-            <Route path="/" element={null} />
-            <Route path="/gallery" element={null} />
-          </Route>
-          <Route path="/record" element={<RecordPage />} />
-          <Route path="/dream/:id" element={<DreamRoomPage />} />
-          <Route path="/share/:id" element={<SharePage />} />
-          <Route path="/report" element={<ReportPage />} />
-          <Route path="/pool" element={<DreamPoolPage />} />
-          <Route
-            path="*"
-            element={
-              <div className="min-h-screen bg-[#0a0a0f] text-zinc-100 flex flex-col items-center justify-center">
-                <p className="text-zinc-400">页面不存在</p>
-              </div>
-            }
-          />
-        </Routes>
-      </Suspense>
-      <GlobalNav />
-      <DisclaimerFooter />
-      <CustomCursor />
-    </Router>
+            <Route element={<WorldPage />}>
+              <Route path="/" element={null} />
+              <Route path="/gallery" element={null} />
+            </Route>
+            <Route path="/record" element={<RecordPage />} />
+            <Route path="/dream/:id" element={<DreamRoomPage />} />
+            <Route path="/share/:id" element={<SharePage />} />
+            <Route path="/report" element={<ReportPage />} />
+            <Route path="/pool" element={<DreamPoolPage />} />
+            <Route
+              path="*"
+              element={
+                <div className="min-h-screen bg-[#0a0a0f] text-zinc-100 flex flex-col items-center justify-center">
+                  <p className="text-zinc-400">页面不存在</p>
+                </div>
+              }
+            />
+          </Routes>
+        </Suspense>
+        <GlobalNav />
+        <DisclaimerFooter />
+        <CustomCursor />
+      </Router>
+    </ErrorBoundary>
   );
 }

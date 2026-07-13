@@ -5,7 +5,7 @@
 
 import { useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { Sparkles, AlertTriangle, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui";
 import { useDreamStore } from "@/store/useDreamStore";
 import { DEFAULT_EMOTION, getEmotionByWord } from "@/lib/emotions";
@@ -57,6 +57,8 @@ export function RecordForm({ onSaved }: RecordFormProps) {
     () => getPresetByName(meta.aestheticPreset)?.name ?? "Ethereal",
   );
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const hasText = rawText.trim().length > 0;
   const canSave = hasText && !saving;
@@ -81,9 +83,23 @@ export function RecordForm({ onSaved }: RecordFormProps) {
         shared: false,
       };
       await addDream(dream);
+      setSaveError(false);
       onSaved?.(dream.id);
+    } catch (err) {
+      console.error("[DreamGate] addDream failed:", err);
+      setSaveError(true);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(rawText);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard 不可用就静默 */
     }
   };
 
@@ -142,6 +158,33 @@ export function RecordForm({ onSaved }: RecordFormProps) {
           <p className="mt-2 text-center text-xs text-dreamgate-text-muted">
             至少记下一个字，便能暂存。情绪、颜色、标签都不阻塞保存。
           </p>
+        )}
+        {saveError && (
+          <div
+            role="alert"
+            className="mt-3 flex flex-col gap-3 rounded-2xl border border-amber-400/20 bg-dreamgate-elevated/40 px-5 py-4 backdrop-blur-md"
+          >
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-300/80" />
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium text-dreamgate-text-primary">
+                  保存失败
+                </p>
+                <p className="text-xs text-dreamgate-text-muted">
+                  可能是浏览器存储受限（隐身模式 / 配额已满）。可重试，或先复制梦境文本备用。
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pl-7">
+              <Button variant="ghost" size="sm" onClick={handleSave} disabled={!canSave}>
+                重试
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleCopy}>
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+                {copied ? "已复制" : "复制文本"}
+              </Button>
+            </div>
+          </div>
         )}
       </motion.div>
     </motion.div>

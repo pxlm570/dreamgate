@@ -14,8 +14,8 @@ import { cn } from "@/lib/utils";
 
 declare global {
   interface Window {
-    SpeechRecognition?: any;
-    webkitSpeechRecognition?: any;
+    SpeechRecognition?: new () => RecognitionLike;
+    webkitSpeechRecognition?: new () => RecognitionLike;
   }
 }
 
@@ -23,12 +23,22 @@ export interface VoiceCaptureProps {
   onTranscript: (text: string) => void;
 }
 
+/** Web Speech API 事件最小类型（浏览器无官方 TS 类型，按实际用到的字段声明） */
+interface SpeechRecognitionResultLike {
+  isFinal: boolean;
+  0?: { transcript?: string };
+}
+interface SpeechRecognitionEventLike {
+  resultIndex: number;
+  results: ArrayLike<SpeechRecognitionResultLike>;
+}
+
 interface RecognitionLike {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
-  onresult: ((e: any) => void) | null;
-  onerror: ((e: any) => void) | null;
+  onresult: ((e: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((e: { error?: string }) => void) | null;
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
@@ -80,7 +90,7 @@ export function VoiceCapture({ onTranscript }: VoiceCaptureProps) {
       rec.lang = "zh-CN";
       rec.continuous = true;
       rec.interimResults = true;
-      rec.onresult = (e: any) => {
+      rec.onresult = (e: SpeechRecognitionEventLike) => {
         let live = "";
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const res = e.results[i];

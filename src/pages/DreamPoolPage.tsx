@@ -31,6 +31,7 @@ export default function DreamPoolPage() {
   const setView = useDreamStore((s) => s.setView);
   const dreams = useDreamStore((s) => s.dreams);
   const updateDream = useDreamStore((s) => s.updateDream);
+  const loaded = useDreamStore((s) => s.loaded);
   const [localPool, setLocalPool] = useState<PoolDream[]>(() =>
     typeof window === "undefined" ? [] : readLocalPool(),
   );
@@ -105,7 +106,11 @@ export default function DreamPoolPage() {
           </div>
           {/* 投递入口：有未投递的梦才出现；没有梦则引导去记录 */}
           <div className="mt-7">
-            {nextToShare ? (
+            {!loaded ? (
+              <Caption as="p" className="text-[11px] text-dreamgate-text-muted">
+                正在拾取梦境…
+              </Caption>
+            ) : nextToShare ? (
               <div className="flex flex-wrap items-center gap-3">
                 <Button variant="ethereal" size="sm" onClick={share}>
                   <Anchor size={14} />
